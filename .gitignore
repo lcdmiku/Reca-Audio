@@ -29,11 +29,3 @@ Audio-Omni/model/*.ckpt
 .idea/
 .DS_Store
 Thumbs.db
-
-# ---- 历史遗留：已复制到 docs/ 与 runs/，等 ACL 修复后从磁盘删除 ----
-/RecA-Audio-实验思路.md
-/RecA-Audio-执行方案-课程报告版.md
-/RecA-Audio-两周冲刺方案.md
-/执行清单-D0到D14.md
-/scripts/
-/server/
