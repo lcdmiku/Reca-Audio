@@ -20,8 +20,7 @@ from einops import rearrange
 from torchvision import transforms
 from torchvision.transforms import v2
 
-from .models.factory import create_model_from_config
-from .models.utils import load_ckpt_state_dict
+from .loader import load_model_bundle
 from .inference.generation import generate_diffusion_cond
 from .prompts import (
     build_prompt,
@@ -61,26 +60,15 @@ class AudioOmni:
         with open(config_path) as f:
             self.model_config = json.load(f)
 
-        self.model = create_model_from_config(self.model_config)
-        self.model.load_state_dict(load_ckpt_state_dict(ckpt_path))
+        self.model, self.model_config, self.sample_rate, self.sample_size = load_model_bundle(
+            self.model_config,
+            ckpt_path,
+            device=device,
+            conditioner_device=conditioner_device,
+            dtype=dtype,
+        )
         self.device = torch.device(device)
-        self.model = self.model.to(self.device).eval().requires_grad_(False)
-
-        if dtype is not None:
-            if dtype in ("float16", "fp16", "half"):
-                self.model.model.to(torch.float16)
-            elif dtype in ("float32", "fp32"):
-                self.model.model.to(torch.float32)
-            else:
-                raise ValueError(f"unsupported dtype: {dtype!r}")
-
-        # 组件并行：Qwen 理解塔可以单独占一张卡，生成器那张卡就不用背 3B 的它
-        self.conditioner_device = torch.device(conditioner_device) if conditioner_device else self.device
-        if self.conditioner_device != self.device:
-            self.model.conditioner.to(self.conditioner_device)
-
-        self.sample_rate = self.model_config["sample_rate"]
-        self.sample_size = self.model_config["sample_size"]
+        self.conditioner_device = getattr(self.model, "conditioner_device", self.device)
         self.memory_report("after load")
 
     # ------------------------------------------------------------------

@@ -36,6 +36,10 @@ import io
 _AUDIO_INPUT_SR = 44100
 _AUDIO_INPUT_SECONDS = 10
 
+# 由 create_ui() 设置，供 load_model() 在未显式传参时使用（与 API 路径保持同一套精度/并行策略）
+_GLOBAL_CONDITIONER_DEVICE = None
+_GLOBAL_DTYPE = None
+
 _SEGMENT_DURATION = 11
 _OVERLAP_DURATION = 1
 _MAX_SHORT_DURATION = 10
@@ -668,7 +672,7 @@ def merge_video_audio(video_path, audio_path, output_path, start_time, duration)
         print(f"Error merging audio and video: {e}")
         return None
 
-def load_model(model_name, model_config=None, model_ckpt_path=None, pretrained_name=None, pretransform_ckpt_path=None, device="cuda", model_half=False):
+def load_model(model_name, model_config=None, model_ckpt_path=None, pretrained_name=None, pretransform_ckpt_path=None, device="cuda", model_half=False, conditioner_device=None, dtype=None):
     global model_configurations
     start_time = time.time()
     
@@ -723,17 +727,19 @@ def load_model(model_name, model_config=None, model_ckpt_path=None, pretrained_n
     if hasattr(model, 'pretransform') and model.pretransform is not None:
         model.pretransform = model.pretransform.to(dtype=torch.float32).eval()
 
-    if model_half:
-        # If using half precision, keep pretransform in float32
-        if hasattr(model, 'pretransform') and model.pretransform is not None:
-            # pretransform must stay float32, so save it first
-            pretransform_backup = model.pretransform
-            model.pretransform = None
-            model.to(torch.float16)
-            # Restore pretransform and keep float32
-            model.pretransform = pretransform_backup.to(dtype=torch.float32).eval()
-        else:
-            model.to(torch.float16)
+    from ..loader import apply_precision_and_parallelism
+
+    if conditioner_device is None:
+        conditioner_device = _GLOBAL_CONDITIONER_DEVICE
+    if dtype is None:
+        dtype = _GLOBAL_DTYPE
+    apply_precision_and_parallelism(
+        model,
+        device=device,
+        conditioner_device=conditioner_device,
+        dtype=dtype,
+        model_half=model_half,
+    )
     
     load_time = time.time() - start_time
     print(f"Done loading model {model_name} (took {load_time:.2f}s)")
@@ -2374,9 +2380,14 @@ def create_txt2audio_ui(model_config_map, default_model_name):
         )
     return ui
 
-def create_ui(model_config_path=None, ckpt_path=None, pretrained_name=None, pretransform_ckpt_path=None, model_half=False):
+def create_ui(model_config_path=None, ckpt_path=None, pretrained_name=None, pretransform_ckpt_path=None, model_half=False, conditioner_device=None, dtype=None):
     global model_configurations
     global device
+    global _GLOBAL_CONDITIONER_DEVICE, _GLOBAL_DTYPE
+
+    # 与 API 路径共用同一套精度/并行策略
+    _GLOBAL_CONDITIONER_DEVICE = conditioner_device
+    _GLOBAL_DTYPE = dtype
 
     if model_config_path is not None:
         # Load config from json file

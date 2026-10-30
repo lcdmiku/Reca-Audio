@@ -187,3 +187,32 @@ DiT 只有 ~2B 参数，真正的张量并行要改每一层的切分规则与�
 
 两者都不需要重写 attention/linear，风险最低。真正的 TP/PP 留给「模型大到单卡放不下」的场景。
 
+---
+
+## 9. 加载逻辑收敛 + Gradio 兼容（2026-10-30 追加）
+
+### 9.1 问题
+
+之前 API 与 Gradio 各自实现了一遍模型加载，我加的 `dtype` / `conditioner_device` 只进了 API。
+而且 `generate_diffusion_cond` 用了 `@torch.inference_mode()`，它产出的 **inference tensor**
+在 Gradio 后处理里做原地运算/保存时会报错（`Inference tensors cannot be used in inplace operations`）。
+API 路径通过 `_postprocess` 的普通运算躲过了，Gradio 没躲过。
+
+### 9.2 改法
+
+| 改动 | 说明 |
+|---|---|
+| 新增 `audio_omni/loader.py` | 唯一的加载入口：`load_model_bundle()` + `apply_precision_and_parallelism()` |
+| `AudioOmni.__init__` | 改为调用 `load_model_bundle()`，行为不变 |
+| `gradio.load_model` | 精度/并行部分改为调用同一个 `apply_precision_and_parallelism()`，不再各写一份 |
+| `generation.py` | `@torch.inference_mode()` → `@torch.no_grad()`（显存收益相同，无 inference tensor 限制） |
+| `generation.py` | `conditioner_device` 缺省时读 `model.conditioner_device`，所有调用方自动继承 |
+| `create_ui` / `run_gradio.py` | 新增 `--cond-device`、`--dtype`，与 API/脚本一致 |
+
+### 9.3 一致性约定
+
+- 精度策略只在 `apply_precision_and_parallelism()` 里定义一次：`dtype` 只改 DiT；`model_half` 保留旧语义；
+- 组件并行的设备记录在 `model.conditioner_device` 上，采样函数默认读取；
+- 新增入口（CLI / Gradio / API）都应走 `load_model_bundle()`，不要再另写加载逻辑。
+
+

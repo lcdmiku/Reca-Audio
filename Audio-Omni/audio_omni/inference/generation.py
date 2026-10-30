@@ -94,7 +94,7 @@ def generate_diffusion_uncond(
     return sampled
 
 
-@torch.inference_mode()
+@torch.no_grad()
 def generate_diffusion_cond(
         model,
         steps: int = 250,
@@ -158,6 +158,9 @@ def generate_diffusion_cond(
 
     # Conditioning
     assert conditioning is not None or conditioning_tensors is not None, "Must provide either conditioning or conditioning_tensors"
+    if conditioner_device is None:
+        # loader 会把组件并行决定的设备记在 model 上，调用方无需重复传参
+        conditioner_device = getattr(model, "conditioner_device", None)
     cond_device = conditioner_device if conditioner_device is not None else device
     if conditioning_tensors is None:
         conditioning_tensors = model.conditioner(conditioning, cond_device)
