@@ -23,8 +23,8 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Run gradio interface')
     parser.add_argument('--pretrained-name', type=str, help='Name of pretrained model', required=False)
-    parser.add_argument('--model-config', type=str, help='Path to model config', required=False)
-    parser.add_argument('--ckpt-path', type=str, help='Path to model checkpoint', required=False)
+    parser.add_argument('--model-config', type=str, help='Path to model config（不传则自动在 Audio-Omni/model/ 下找）', required=False)
+    parser.add_argument('--ckpt-path', type=str, help='Path to model checkpoint（不传则取配置同目录的 model.ckpt）', required=False)
     parser.add_argument('--pretransform-ckpt-path', type=str, help='Optional to model pretransform checkpoint', required=False)
     parser.add_argument('--share', action='store_true', help='Create a publicly shareable link', required=False)
     parser.add_argument('--server-port', type=int, help='Port to run the gradio interface on', required=False, default=7860)
