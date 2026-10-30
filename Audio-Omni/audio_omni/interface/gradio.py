@@ -1,7 +1,6 @@
 import gc
 import platform
 import os
-from pathlib import Path
 import subprocess as sp
 import time
 
@@ -1039,7 +1038,7 @@ def generate_cond(
             model_config = json.load(f)
     else:
         model_config = None
-    target_fps = (model_config or {}).get("video_fps", 5)
+    target_fps = model_config.get("video_fps", 5)
 
     if current_model is None or model_name != current_model_name:
         current_model, model_config, sample_rate, sample_size = load_model(
@@ -2381,21 +2380,6 @@ def create_txt2audio_ui(model_config_map, default_model_name):
         )
     return ui
 
-def _discover_model_config(ckpt_path=None):
-    """没显式传 --model-config 时，按常见目录布局找一个，避免 model_config=None 崩在 .get 上。"""
-    candidates = []
-    if ckpt_path:
-        candidates.append(Path(ckpt_path).resolve().parent / "Audio-Omni.json")
-    candidates += [Path("Audio-Omni/model/Audio-Omni.json"), Path("model/Audio-Omni.json")]
-    for cand in candidates:
-        if cand.is_file():
-            print(f"[config] 自动使用模型配置：{cand}")
-            return str(cand)
-    raise FileNotFoundError(
-        "找不到模型配置，请显式传 --model-config（例如 Audio-Omni/model/Audio-Omni.json）"
-    )
-
-
 def create_ui(model_config_path=None, ckpt_path=None, pretrained_name=None, pretransform_ckpt_path=None, model_half=False, conditioner_device=None, dtype=None):
     global model_configurations
     global device
@@ -2404,14 +2388,6 @@ def create_ui(model_config_path=None, ckpt_path=None, pretrained_name=None, pret
     # 与 API 路径共用同一套精度/并行策略
     _GLOBAL_CONDITIONER_DEVICE = conditioner_device
     _GLOBAL_DTYPE = dtype
-
-    if model_config_path is None and pretrained_name is None:
-        model_config_path = _discover_model_config(ckpt_path)
-    if ckpt_path is None and model_config_path is not None:
-        default_ckpt = Path(model_config_path).resolve().parent / "model.ckpt"
-        if default_ckpt.is_file():
-            ckpt_path = str(default_ckpt)
-            print(f"[config] 自动使用权重：{ckpt_path}")
 
     if model_config_path is not None:
         # Load config from json file
