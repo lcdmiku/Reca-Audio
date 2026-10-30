@@ -1,0 +1,39 @@
+# ---- python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- 运行产物 / 数据（绝不进 git）----
+data/*
+!data/README.md
+features/
+runs/ckpt/
+runs/logs/
+runs/samples/
+runs/outputs/
+output/
+*.log
+
+# ---- 模型权重 ----
+*.ckpt
+*.pth
+*.safetensors
+Audio-Omni/model/*.ckpt
+
+# ---- 论文 PDF（本地保留即可）----
+*.pdf
+
+# ---- 编辑器 ----
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- 历史遗留：已复制到 docs/ 与 runs/，等 ACL 修复后从磁盘删除 ----
+/RecA-Audio-实验思路.md
+/RecA-Audio-执行方案-课程报告版.md
+/RecA-Audio-两周冲刺方案.md
+/执行清单-D0到D14.md
+/scripts/
+/server/

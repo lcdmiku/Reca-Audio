@@ -1,0 +1,35 @@
+# 备选方案：从零建环境（需要 pytorch 频道可访问）。
+# 服务器上 `huggingface.co` 不通时，先 export HF_ENDPOINT=https://hf-mirror.com
+#
+# 优先用 server/setup_env.sh（克隆已有的 dl 环境），不要轻易走这个文件。
+name: reca-audio
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  # V100 = sm70，必须用 cu121/cu124 的轮子；不要 cu128+（官方已不带 sm70 内核）
+  - pytorch=2.5.1
+  - torchaudio=2.5.1
+  - pytorch-cuda=12.1
+  # librosa/numba 对 numpy 2 兼容性差，钉在 1.26
+  - numpy=1.26
+  - scipy
+  - pandas
+  - librosa=0.10.2
+  - soundfile
+  - ffmpeg
+  - tqdm
+  - pyyaml
+  - einops
+  - tensorboard
+  - pip
+  - pip:
+      - transformers>=4.44,<4.50
+      - datasets>=3.0
+      - huggingface_hub>=0.26
+      - accelerate>=1.0
+      - timm>=1.0
+      # 不要装 flash-attn / xformers：V100 上没有可用内核
