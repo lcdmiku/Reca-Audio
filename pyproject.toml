@@ -2,7 +2,7 @@
 name = "reca-audio"
 version = "0.1.0"
 description = "Reconstruction alignment for audio generation (course project)"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [tool.setuptools.packages.find]
 where = ["src"]
