@@ -46,7 +46,17 @@ class AudioOmni:
         config_path: str = "model/Audio-Omni.json",
         ckpt_path: str = "model/model.ckpt",
         device: str = "cuda",
+        conditioner_device: tp.Optional[str] = None,
+        dtype: tp.Optional[str] = None,
     ):
+        """加载模型。
+
+        Args:
+            device: 生成器（DiT + VAE）所在设备。
+            conditioner_device: 理解塔（Qwen2.5-Omni）所在设备。单卡显存不够时，
+                把它放到另一张卡（如 "cuda:1"）——两边只交换几十 MB 的条件张量。
+            dtype: 生成头精度，"float16" 可再省约一半 DiT 权重显存。
+        """
         self._config_path = config_path
         with open(config_path) as f:
             self.model_config = json.load(f)
@@ -54,10 +64,35 @@ class AudioOmni:
         self.model = create_model_from_config(self.model_config)
         self.model.load_state_dict(load_ckpt_state_dict(ckpt_path))
         self.device = torch.device(device)
-        self.model = self.model.to(self.device).eval()
+        self.model = self.model.to(self.device).eval().requires_grad_(False)
+
+        if dtype is not None:
+            if dtype in ("float16", "fp16", "half"):
+                self.model.model.to(torch.float16)
+            elif dtype in ("float32", "fp32"):
+                self.model.model.to(torch.float32)
+            else:
+                raise ValueError(f"unsupported dtype: {dtype!r}")
+
+        # 组件并行：Qwen 理解塔可以单独占一张卡，生成器那张卡就不用背 3B 的它
+        self.conditioner_device = torch.device(conditioner_device) if conditioner_device else self.device
+        if self.conditioner_device != self.device:
+            self.model.conditioner.to(self.conditioner_device)
 
         self.sample_rate = self.model_config["sample_rate"]
         self.sample_size = self.model_config["sample_size"]
+        self.memory_report("after load")
+
+    # ------------------------------------------------------------------
+    def memory_report(self, tag: str = "") -> None:
+        """打印当前卡的显存占用，定位 OOM 发生在哪一步。"""
+        if not torch.cuda.is_available():
+            return
+        for i in range(torch.cuda.device_count()):
+            alloc = torch.cuda.memory_allocated(i) / 1e9
+            reserved = torch.cuda.memory_reserved(i) / 1e9
+            if alloc > 0.05:
+                print(f"[mem:{tag}] cuda:{i} allocated={alloc:.2f}GB reserved={reserved:.2f}GB", flush=True)
 
     # ------------------------------------------------------------------
     # Generation (T2A, T2M, TTS, V2A, V2M)
@@ -107,6 +142,7 @@ class AudioOmni:
             steps=steps,
             cfg_scale=cfg_scale,
             conditioning=conditioning,
+            conditioner_device=self.conditioner_device,
             sample_size=self.sample_size,
             sample_rate=self.sample_rate,
             seed=seed,
@@ -167,6 +203,7 @@ class AudioOmni:
             steps=steps,
             cfg_scale=cfg_scale,
             conditioning=conditioning,
+            conditioner_device=self.conditioner_device,
             sample_size=self.sample_size,
             sample_rate=self.sample_rate,
             seed=seed,
@@ -215,6 +252,7 @@ class AudioOmni:
             steps=steps,
             cfg_scale=cfg_scale,
             conditioning=conditioning,
+            conditioner_device=self.conditioner_device,
             sample_size=self.sample_size,
             sample_rate=self.sample_rate,
             seed=seed,

@@ -135,3 +135,55 @@ python runs/scripts/reca_diagnose.py \
 | Qwen fp32 显存 12 GB | 与 DiT/VAE 同卡可能吃紧 | 先 `CUDA_VISIBLE_DEVICES=0` 单卡；必要时换 fp16 |
 | 44.1 kHz 生成 vs 10 s 输入 | `sample_size=485100` ≈ 11 s | 评测时按前 10 s 对齐 |
 | `_postprocess` 做了峰值归一 | 会改变响度 | 评测重建相似度时先做响度对齐 |
+
+---
+
+## 8. OOM 与多卡推理（2026-10-30 追加）
+
+现象：T2A 生成阶段 OOM，且上游不支持多卡。
+
+### 8.1 根因判断（按可能性排序）
+
+| # | 原因 | 证据 / 判断 |
+|---|---|---|
+| 1 | **Qwen 理解塔 fp32 常驻 12 GB**，与 DiT（~8 GB）+ VAE 挤在同一张卡 | 单卡峰值 ~21 GB，若卡上还有别的进程就必然 OOM |
+| 2 | 生成入口没有 `inference_mode` | `sample_discrete_euler` 本身有 `@torch.no_grad()`，但条件构造、VAE 解码、后处理仍在建图 |
+| 3 | `embedding_scale != 1` 时 `batch_cfg=True` 把 batch 翻倍 | 显存与时间都 ×2 |
+| 4 | fp32 权重 + fp32 激活 | DiT 权重 8 GB 无法压缩 |
+
+### 8.2 已做的改动
+
+| 文件 | 改动 |
+|---|---|
+| `inference/generation.py` | 整个 `generate_diffusion_cond` 加 `@torch.inference_mode()`；新增 `conditioner_device` 参数，条件在另一张卡算完后只把结果（~6 MB）搬回生成卡 |
+| `api.py` | `AudioOmni(..., conditioner_device="cuda:1", dtype="float16")`；新增 `memory_report()` 打印各卡 allocated/reserved |
+| `runs/scripts/t2a_generate.py` | 批量生成，支持分片、`--cond-device`、`--dtype`、OOM 单独捕获 |
+| `runs/scripts/run_t2a_shards.sh` | 8 进程 × 8 卡吞吐模式 |
+
+### 8.3 三种用法
+
+```bash
+# A. 吞吐优先：8 卡各跑一个进程（要求单卡放得下完整模型）
+NUM_SHARDS=8 bash runs/scripts/run_t2a_shards.sh \
+  --config Audio-Omni/model/Audio-Omni.json --ckpt Audio-Omni/model/model.ckpt \
+  --prompts prompts.txt --out runs/samples/t2a --steps 100
+
+# B. 显存优先：一个进程用两张卡，Qwen 与生成器分开
+CUDA_VISIBLE_DEVICES=0,1 python runs/scripts/t2a_generate.py \
+  --config Audio-Omni/model/Audio-Omni.json --ckpt Audio-Omni/model/model.ckpt \
+  --prompts prompts.txt --out runs/samples/t2a \
+  --device cuda:0 --cond-device cuda:1 --steps 100
+
+# C. 还不够：DiT 权重降到 fp16
+... --cond-device cuda:1 --dtype float16
+```
+
+### 8.4 说明：为什么不是张量并行
+
+DiT 只有 ~2B 参数，真正的张量并行要改每一层的切分规则与通信，收益不如「组件并行 + 进程级数据并行」直接：
+
+- **组件并行**把 12 GB 的 Qwen 挪走，单卡峰值从 ~21 GB 降到 ~9 GB，一次解决 OOM；
+- **进程级数据并行**用 8 张卡把吞吐拉到 8 倍，且完全不用改模型代码。
+
+两者都不需要重写 attention/linear，风险最低。真正的 TP/PP 留给「模型大到单卡放不下」的场景。
+

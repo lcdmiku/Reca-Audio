@@ -94,6 +94,7 @@ def generate_diffusion_uncond(
     return sampled
 
 
+@torch.inference_mode()
 def generate_diffusion_cond(
         model,
         steps: int = 250,
@@ -107,6 +108,7 @@ def generate_diffusion_cond(
         sample_rate: int = 48000,
         seed: int = -1,
         device: str = "cuda",
+        conditioner_device: tp.Optional[str] = None,
         init_audio: tp.Optional[tp.Tuple[int, torch.Tensor]] = None,
         init_noise_level: float = 1.0,
         mask_args: dict = None,
@@ -156,8 +158,18 @@ def generate_diffusion_cond(
 
     # Conditioning
     assert conditioning is not None or conditioning_tensors is not None, "Must provide either conditioning or conditioning_tensors"
+    cond_device = conditioner_device if conditioner_device is not None else device
     if conditioning_tensors is None:
-        conditioning_tensors = model.conditioner(conditioning, device)
+        conditioning_tensors = model.conditioner(conditioning, cond_device)
+        if str(cond_device) != str(device):
+            # 理解塔在另一张卡：只把它的输出（几十 MB）搬回生成器所在卡
+            moved = {}
+            for k, v in conditioning_tensors.items():
+                if isinstance(v, (tuple, list)):
+                    moved[k] = tuple(t.to(device) if isinstance(t, torch.Tensor) else t for t in v)
+                else:
+                    moved[k] = v
+            conditioning_tensors = moved
     conditioning_inputs = model.get_conditioning_inputs(conditioning_tensors)
 
     if negative_conditioning is not None or negative_conditioning_tensors is not None:
