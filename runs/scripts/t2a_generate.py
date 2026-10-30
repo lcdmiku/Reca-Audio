@@ -35,6 +35,13 @@ def bootstrap() -> None:
 
 def load_prompts(path: str) -> list[str]:
     p = Path(path)
+    if not p.exists():
+        hint = (
+            "\n仓库自带示例：\n"
+            "  runs/prompts/t2a_smoke.txt   （音效，配 --task T2A）\n"
+            "  runs/prompts/t2m_smoke.txt   （音乐，配 --task T2M）"
+        )
+        raise SystemExit(f"[fatal] 提示词文件不存在：{path}{hint}")
     if p.suffix == ".jsonl":
         out = []
         for line in p.read_text(encoding="utf-8").splitlines():
@@ -49,7 +56,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="Audio-Omni/model/Audio-Omni.json")
     ap.add_argument("--ckpt", default="Audio-Omni/model/model.ckpt")
-    ap.add_argument("--prompts", required=True, help="txt（每行一条）或 jsonl（含 prompt 字段）")
+    ap.add_argument("--prompts", default="runs/prompts/t2a_smoke.txt",
+                    help="txt（每行一条，允许 # 注释）或 jsonl（含 prompt 字段）")
     ap.add_argument("--out", required=True)
     ap.add_argument("--task", default="T2A", choices=["T2A", "T2M"])
     ap.add_argument("--limit", type=int, default=0)

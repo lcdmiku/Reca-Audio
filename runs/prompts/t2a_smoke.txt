@@ -1,0 +1,10 @@
+# T2A 冒烟提示词：偏重"细粒度声学细节"，正好对应 RecA 想改善的部分
+# 用法：--prompts runs/prompts/t2a_smoke.txt
+A wooden door creaks open slowly in a small tiled bathroom, with a faint water drip in the background.
+Heavy rain hammering a tin roof, distant thunder rolling, water gurgling down a downpipe.
+A skateboard rolls over rough asphalt, pops an ollie, and lands with a sharp clack.
+A vintage film projector clatters in a quiet room, with a soft motor hum and the flutter of celluloid.
+A cat purrs close to the microphone while a clock ticks softly in the background.
+Footsteps in fresh snow, crisp and muffled, with a distant dog barking.
+A kettle whistles and clicks off on a gas stove in a bright kitchen, ceramic cups clinking nearby.
+An old bicycle freewheel clicks as it coasts down a gravel path, wind moving through nearby trees.
