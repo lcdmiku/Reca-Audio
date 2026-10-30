@@ -255,9 +255,9 @@ class AudiocraftCompressionPretransform(Pretransform):
         # return self.model.decode(z)
 
     def tokenize(self, x):
-        with torch.cuda.amp.autocast(enabled=False):
+        with torch.amp.autocast("cuda", enabled=False):
             return self.model.encode(x.to(torch.float16))[0]
     
     def decode_tokens(self, tokens):
-        with torch.cuda.amp.autocast(enabled=False):
+        with torch.amp.autocast("cuda", enabled=False):
             return self.model.decode(tokens)

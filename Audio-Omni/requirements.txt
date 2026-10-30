@@ -1,3 +1,7 @@
+# 这是一份完整环境冻结快照（2026-06，上游提供），不是依赖声明。
+# 依赖声明请以 pyproject.toml 为准：pip install -e ".[demo,train]"
+# 注意：torch==2.6.0+cu124 无法从 PyPI 直接装，需要
+#   pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 absl-py==2.4.0
 accelerate==1.13.0
 aeiou==0.0.20

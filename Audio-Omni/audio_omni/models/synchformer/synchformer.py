@@ -36,7 +36,7 @@ class Synchformer(nn.Module):
 
 if __name__ == "__main__":
     model = Synchformer().cuda().eval()
-    sd = torch.load('./ext_weights/synchformer_state_dict.pth', weights_only=True)
+    sd = torch.load('./ext_weights/synchformer_state_dict.pth', map_location='cpu', weights_only=True)
     model.load_state_dict(sd)
 
     vid = torch.randn(2, 7, 16, 3, 224, 224).cuda()

@@ -7,8 +7,14 @@ from einops.layers.torch import Rearrange
 import torch
 import torch.nn.functional as F
 from torch import nn, einsum
-from torch.cuda.amp import autocast
+from torch.amp import autocast as _autocast
 from typing import Callable, Literal
+
+
+def autocast(enabled: bool = True):
+    """兼容包装：`torch.cuda.amp.autocast` 已弃用，统一走 `torch.amp.autocast("cuda", ...)`。"""
+    return _autocast(device_type="cuda", enabled=enabled)
+
         
 try:
     from flash_attn import flash_attn_func, flash_attn_kvpacked_func

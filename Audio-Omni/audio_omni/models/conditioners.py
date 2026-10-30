@@ -2,6 +2,7 @@ import os
 import torch
 import typing as tp
 
+from packaging import version
 from torch import nn
 import einops
 from torch.nn.utils.rnn import pad_sequence
@@ -106,10 +107,16 @@ class OmniConditioner(Conditioner):
             print("qwen-omni: skeleton created (SKIP_QWEN_WEIGHTS=1), weights will come from ckpt.")
         else:
             self.processor = Qwen2_5OmniProcessor.from_pretrained(_qwen_model_path)
+            # transformers>=4.56 起用 dtype=；旧名 torch_dtype= 在 v5 已移除
+            import transformers
+
+            _dtype_kw = (
+                "dtype" if version.parse(transformers.__version__) >= version.parse("4.56") else "torch_dtype"
+            )
             self.model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
                 _qwen_model_path,
-                torch_dtype=self._omni_dtype,
                 attn_implementation="sdpa",
+                **{_dtype_kw: self._omni_dtype},
             )
             print("qwen-omni loaded from pretrained weights.")
 
@@ -185,7 +192,7 @@ class OmniConditioner(Conditioner):
             inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
 
             with torch.no_grad():
-                with torch.cuda.amp.autocast(enabled=False):  # Disable mixed precision, use float32
+                with torch.amp.autocast("cuda", enabled=False):  # Disable mixed precision, use float32
                     qwen_omni_output = self.model.thinker(**inputs,output_hidden_states=True,return_dict=True)
                     omni_features = qwen_omni_output.hidden_states[self.layer_idx].to(self._omni_dtype) # omni_features: [B, seq_len, hidden_dim]
 

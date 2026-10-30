@@ -263,7 +263,7 @@ def generate_diffusion_cond(
         sampled = sampled.to(next(model.pretransform.parameters()).dtype)
 
         model.pretransform = model.pretransform.to(dtype=torch.float32).eval()
-        with torch.cuda.amp.autocast(enabled=False):        
+        with torch.amp.autocast("cuda", enabled=False):        
             sampled = model.pretransform.decode(sampled.to(dtype=torch.float32))
 
     # Return audio

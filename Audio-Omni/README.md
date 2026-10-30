@@ -53,9 +53,16 @@ cd Audio-Omni
 conda create -n audio-omni python=3.11 -y
 conda activate audio-omni
 
-pip install -e .
+# 依赖声明在 pyproject.toml，按需选 extras
+pip install -e ".[demo]"           # 基础 + Gradio demo
+# pip install -e ".[demo,train]"   # 追加后训练依赖
+# pip install -e ".[video]"        # 追加 V2A/V2M 的视频依赖 (decord / av / mmaudio)
+
 conda install -c conda-forge ffmpeg libsndfile
 ```
+
+> **Volta（V100）等 sm70 显卡**：不要安装 `flash-attn` / `natten`；Qwen 理解塔会自动退回 fp32，
+> 也可以用 `AUDIO_OMNI_QWEN_DTYPE=float16` 手动指定。
 
 Additional packages (install separately if needed):
 
