@@ -60,12 +60,12 @@ HF 上的数据集可以用各自的 `prepare` 子命令导出；数据集 id �
 ## 三步流程（以 AudioCaps 为例）
 
 ```bash
-# 1) 生成（8 卡并行，每卡一个分片）
-bash runs/Benchmark/run_shards.sh runs/Benchmark/AudioCaps/evaluate.py 8 \
+# 1) 生成（8 卡 → 4 个分片，每片 2 卡：主干 cuda:0、理解塔 cuda:1）
+GPUS_PER_PROC=2 bash runs/Benchmark/run_shards.sh runs/Benchmark/AudioCaps/evaluate.py 4 \
   --prompts runs/Benchmark/AudioCaps/prompts.jsonl \
   --out runs/Benchmark/_runs/audiocaps \
   --model-config Audio-Omni/model/Audio-Omni.json --ckpt Audio-Omni/model/model.ckpt \
-  --cond-device cuda:0 --dtype float16 --steps 100 --cfg 6.0
+  --dtype float16 --steps 100 --cfg 6.0
 
 # 2) 合并分片清单
 python runs/Benchmark/AudioCaps/evaluate.py merge --out runs/Benchmark/_runs/audiocaps
@@ -74,6 +74,16 @@ python runs/Benchmark/AudioCaps/evaluate.py merge --out runs/Benchmark/_runs/aud
 python runs/Benchmark/AudioCaps/evaluate.py score \
   --out runs/Benchmark/_runs/audiocaps --ref /data/audiocaps_test_audio
 ```
+
+### 显存与分片怎么选
+
+| 模式 | 每进程占用 | 吞吐 | 什么时候用 |
+|---|---|---|---|
+| `GPUS_PER_PROC=1`（8 片 × 1 卡） | fp16 ≈ 22–25 GB，fp32 ≈ 30 GB | 8× | 单卡放得下（32 GB 卡 + fp16 勉强） |
+| `GPUS_PER_PROC=2`（4 片 × 2 卡） | 主干 8 GB + 理解塔 12 GB | 4× | **推荐起点**，稳，不会 OOM |
+
+`run_shards.sh` 会强制设置 `--device cuda:0` 和 `--cond-device cuda:0/1`，所以调用方不用再传这两个参数；
+传了也会被脚本覆盖。
 
 理解类（MMSU/MMAU）把 `gen/score` 换成 `eval/merge`，编辑类把 `merge` 后的 `score` 直接打在
 `manifest.jsonl` 上（`target_audio` 就在 items 里）。
