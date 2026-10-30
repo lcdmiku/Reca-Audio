@@ -162,6 +162,14 @@ def generate_diffusion_cond(
         # loader 会把组件并行决定的设备记在 model 上，调用方无需重复传参
         conditioner_device = getattr(model, "conditioner_device", None)
     cond_device = conditioner_device if conditioner_device is not None else device
+    # 防御：记录值可能与权重实际所在设备不一致（例如被 model.cuda() 整体搬过），以权重为准
+    try:
+        actual = next(model.conditioner.parameters()).device
+        if actual != torch.device(cond_device):
+            print(f"[warn] conditioner 实际在 {actual}，记录为 {cond_device}，改用实际设备", flush=True)
+            cond_device = actual
+    except StopIteration:
+        pass
     if conditioning_tensors is None:
         conditioning_tensors = model.conditioner(conditioning, cond_device)
         if str(cond_device) != str(device):

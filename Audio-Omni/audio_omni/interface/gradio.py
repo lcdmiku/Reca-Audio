@@ -222,7 +222,7 @@ def _get_sync_feature_extractor():
             bigvgan_vocoder_ckpt='bigvgan_path',
             synchformer_ckpt=_SYNCHFORMER_CKPT,
             mode='mode',
-        ).eval().cuda()
+        ).eval().to(device)
     return sync_feature_extractor
 
 def _get_qwen_processor():
@@ -296,8 +296,13 @@ def _restore_model_to_cuda(model):
         return
     if not torch.cuda.is_available():
         return
+    from ..loader import move_model
+
+    cond_device = getattr(model, "conditioner_device", None)
     try:
-        model.cuda()
+        # 不能直接 model.cuda()：那会把理解塔也拽回 cuda:0，
+        # 而 model.conditioner_device 仍记着 cuda:1，下一步生成就会跨卡崩。
+        move_model(model, device=device, conditioner_device=cond_device or device)
     except Exception as e:
         print(f"[Warning] Failed to restore model to CUDA: {e}")
     # Ensure pretransform stays float32
