@@ -12,6 +12,7 @@
 """
 from __future__ import annotations
 
+import os
 import typing as tp
 
 import torch
@@ -131,6 +132,14 @@ def load_model_bundle(
             model.pretransform.load_state_dict(pretransform_state_dict, strict=False)
 
     device = torch.device(device)
+    if verbose:
+        visible = os.environ.get("CUDA_VISIBLE_DEVICES", "<unset>")
+        print(
+            f"[loader] CUDA_VISIBLE_DEVICES={visible} | visible_gpus={torch.cuda.device_count()} | "
+            f"device={device} | conditioner_device={conditioner_device or device} | "
+            f"dtype={dtype or ('float16' if model_half else 'float32')}",
+            flush=True,
+        )
     model.to(device).eval().requires_grad_(False)
 
     apply_precision_and_parallelism(
