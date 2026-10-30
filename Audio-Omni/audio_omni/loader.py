@@ -1,14 +1,16 @@
 """统一的模型加载入口。
 
 历史上 API（`AudioOmni`）与 Gradio（`interface/gradio.load_model`）各自实现了一遍
-加载逻辑，改一处忘一处就会漂移。这里收敛成一个函数，两边都调用它。
+加载逻辑，改一处忘一处就会漂移。这里收敛成一组函数，两边都调用。
 
-职责：
-- 构建模型并从 ckpt 加载（strict 失败时降级 strict=False，与 Gradio 原行为一致）
-- 可选加载 pretransform ckpt
-- 搬到目标设备、冻结参数
-- 精度策略：`dtype` 只调生成头；`model_half` 保留旧语义（整模型半精度，VAE 除外）
-- 组件并行：把理解塔（Qwen）放到另一张卡，并在模型上记录设备，供采样时取默认值
+职责拆分：
+- `move_model()`：只负责“放哪张卡”，支持把理解塔单独放到另一张卡（组件并行）
+- `apply_precision()`：只负责精度（dtype / model_half）
+- `apply_precision_and_parallelism()`：两者的组合，兼容旧调用
+- `load_model_bundle()`：构建 + 加载 ckpt + 搬设备 + 精度，返回四元组
+
+组件并行的关键细节：搬模型时先把 conditioner 摘出来，避免 12 GB 的 Qwen
+在 `.to(device)` 中途先占满生成卡、再被搬到另一张卡——那会让“两卡”在加载阶段就 OOM。
 """
 from __future__ import annotations
 
@@ -45,19 +47,15 @@ def _check_cuda_device(dev: torch.device, name: str) -> None:
         )
 
 
-def apply_precision_and_parallelism(
+def move_model(
     model: torch.nn.Module,
-    *,
     device: tp.Union[str, torch.device] = "cuda",
     conditioner_device: tp.Optional[tp.Union[str, torch.device]] = None,
-    dtype: tp.Optional[str] = None,
-    model_half: bool = False,
 ) -> torch.device:
-    """把「精度」与「组件并行」两件事收敛到一处，供所有加载路径复用。
+    """把模型搬到 `device`；理解塔可单独放到 `conditioner_device`。
 
-    - `dtype`：只改生成头（DiT），理解塔与 VAE 精度不变
-    - `model_half`：旧语义，整模型半精度但 VAE 保持 fp32
-    - `conditioner_device`：理解塔放到另一张卡；结果记在 `model.conditioner_device`
+    先摘出 conditioner 再搬主干，避免它在生成卡上占满显存后被搬走。
+    结果记录在 `model.conditioner_device`，采样函数默认读取。
     """
     device = torch.device(device)
     if conditioner_device is not None:
@@ -67,6 +65,26 @@ def apply_precision_and_parallelism(
     _check_cuda_device(device, "device")
     _check_cuda_device(conditioner_device, "conditioner_device")
 
+    if conditioner_device != device:
+        conditioner = model.conditioner
+        model.conditioner = torch.nn.Identity()  # 临时占位，._apply 时跳过
+        model.to(device).eval().requires_grad_(False)
+        model.conditioner = conditioner
+        # 刚才被跳过，这里补上 eval/冻结，保持与整体一致
+        conditioner.to(conditioner_device).eval().requires_grad_(False)
+    else:
+        model.to(device).eval().requires_grad_(False)
+
+    model.conditioner_device = conditioner_device
+    return conditioner_device
+
+
+def apply_precision(
+    model: torch.nn.Module,
+    dtype: tp.Optional[str] = None,
+    model_half: bool = False,
+) -> None:
+    """精度策略：`dtype` 只改生成头；`model_half` 保留旧语义（VAE 始终 fp32）。"""
     # VAE 始终 fp32，保证解码精度
     if getattr(model, "pretransform", None) is not None:
         model.pretransform = model.pretransform.to(dtype=torch.float32).eval()
@@ -82,10 +100,19 @@ def apply_precision_and_parallelism(
         if pretransform_backup is not None:
             model.pretransform = pretransform_backup.to(dtype=torch.float32).eval()
 
-    if conditioner_device != device:
-        model.conditioner.to(conditioner_device)
-    model.conditioner_device = conditioner_device
-    return conditioner_device
+
+def apply_precision_and_parallelism(
+    model: torch.nn.Module,
+    *,
+    device: tp.Union[str, torch.device] = "cuda",
+    conditioner_device: tp.Optional[tp.Union[str, torch.device]] = None,
+    dtype: tp.Optional[str] = None,
+    model_half: bool = False,
+) -> torch.device:
+    """搬设备 + 定精度。保留这个名字，方便旧调用方一行接入。"""
+    cond_device = move_model(model, device=device, conditioner_device=conditioner_device)
+    apply_precision(model, dtype=dtype, model_half=model_half)
+    return cond_device
 
 
 def load_model_bundle(
@@ -131,16 +158,14 @@ def load_model_bundle(
         if getattr(model, "pretransform", None) is not None:
             model.pretransform.load_state_dict(pretransform_state_dict, strict=False)
 
-    device = torch.device(device)
     if verbose:
         visible = os.environ.get("CUDA_VISIBLE_DEVICES", "<unset>")
         print(
             f"[loader] CUDA_VISIBLE_DEVICES={visible} | visible_gpus={torch.cuda.device_count()} | "
-            f"device={device} | conditioner_device={conditioner_device or device} | "
+            f"device={torch.device(device)} | conditioner_device={conditioner_device or device} | "
             f"dtype={dtype or ('float16' if model_half else 'float32')}",
             flush=True,
         )
-    model.to(device).eval().requires_grad_(False)
 
     apply_precision_and_parallelism(
         model,

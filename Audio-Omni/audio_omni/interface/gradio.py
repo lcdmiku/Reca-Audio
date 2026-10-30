@@ -719,27 +719,16 @@ def load_model(model_name, model_config=None, model_ckpt_path=None, pretrained_n
             model.pretransform.load_state_dict(pretransform_state_dict, strict=False)
         print(f"Done loading pretransform")
 
-    # Move model to device and set to eval mode
-    model.to(device).eval().requires_grad_(False)
-
-    # Ensure pretransform always uses float32 to avoid precision loss
-    # Consistent with generate_diffusion_cond (see generation.py:264)
-    if hasattr(model, 'pretransform') and model.pretransform is not None:
-        model.pretransform = model.pretransform.to(dtype=torch.float32).eval()
-
-    from ..loader import apply_precision_and_parallelism
+    from ..loader import apply_precision, move_model
 
     if conditioner_device is None:
         conditioner_device = _GLOBAL_CONDITIONER_DEVICE
     if dtype is None:
         dtype = _GLOBAL_DTYPE
-    apply_precision_and_parallelism(
-        model,
-        device=device,
-        conditioner_device=conditioner_device,
-        dtype=dtype,
-        model_half=model_half,
-    )
+
+    # 先定设备（把理解塔摘到另一张卡，避免它先占满生成卡），再定精度
+    move_model(model, device=device, conditioner_device=conditioner_device)
+    apply_precision(model, dtype=dtype, model_half=model_half)
     
     load_time = time.time() - start_time
     print(f"Done loading model {model_name} (took {load_time:.2f}s)")
