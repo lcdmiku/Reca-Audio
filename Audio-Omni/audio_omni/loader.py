@@ -32,6 +32,18 @@ def _normalize_dtype(dtype: tp.Optional[str]) -> tp.Optional[torch.dtype]:
     raise ValueError(f"unsupported dtype: {dtype!r}（可选 float16 / float32 / None）")
 
 
+def _check_cuda_device(dev: torch.device, name: str) -> None:
+    """把 "invalid device ordinal" 换成能直接照做的报错。"""
+    if dev.type != "cuda":
+        return
+    n = torch.cuda.device_count()
+    if dev.index is not None and dev.index >= n:
+        raise ValueError(
+            f"{name}={dev} 不可用：当前进程只看到 {n} 张 GPU（cuda:0..cuda:{n - 1}）。"
+            " 多半是 CUDA_VISIBLE_DEVICES 限制了可见卡数，例如写成 CUDA_VISIBLE_DEVICES=0 时 cuda:1 就不存在。"
+        )
+
+
 def apply_precision_and_parallelism(
     model: torch.nn.Module,
     *,
@@ -47,6 +59,12 @@ def apply_precision_and_parallelism(
     - `conditioner_device`：理解塔放到另一张卡；结果记在 `model.conditioner_device`
     """
     device = torch.device(device)
+    if conditioner_device is not None:
+        conditioner_device = torch.device(conditioner_device)
+    else:
+        conditioner_device = device
+    _check_cuda_device(device, "device")
+    _check_cuda_device(conditioner_device, "conditioner_device")
 
     # VAE 始终 fp32，保证解码精度
     if getattr(model, "pretransform", None) is not None:
@@ -63,10 +81,6 @@ def apply_precision_and_parallelism(
         if pretransform_backup is not None:
             model.pretransform = pretransform_backup.to(dtype=torch.float32).eval()
 
-    if conditioner_device is not None:
-        conditioner_device = torch.device(conditioner_device)
-    else:
-        conditioner_device = device
     if conditioner_device != device:
         model.conditioner.to(conditioner_device)
     model.conditioner_device = conditioner_device
@@ -126,6 +140,12 @@ def load_model_bundle(
         dtype=dtype,
         model_half=model_half,
     )
+
+    if verbose and torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            alloc = torch.cuda.memory_allocated(i) / 1e9
+            if alloc > 0.05:
+                print(f"[loader] cuda:{i} allocated={alloc:.2f}GB", flush=True)
 
     sample_rate = model_config["sample_rate"]
     sample_size = model_config["sample_size"]
