@@ -57,6 +57,21 @@ runs/Benchmark/
 
 HF 上的数据集可以用各自的 `prepare` 子命令导出；数据集 id 不确定时用 `--dataset` 显式指定。
 
+### 提示词从哪来
+
+benchmark 的提示词随数据集发布，`prepare` 优先读官方文件：
+
+| Benchmark | 官方发布物 | 关键列 / 字段 | 命令 |
+|---|---|---|---|
+| AudioCaps | `test.csv` | `audiocap_id, youtube_id, start_time, caption` | `prepare --csv test.csv --id-col audiocap_id --prompt-col caption` |
+| MusicCaps | `musiccaps-public.csv` | `ytid, start_s, end_s, caption` | `prepare --csv musiccaps-public.csv --id-col ytid --id-suffix-cols start_s` |
+| MMSU | HF dataset | `question, answer, choices, audio` | `prepare --dataset <id>` |
+| MMAU | HF dataset | 同上 | `prepare --dataset <id>` |
+| AudioEdit | HF dataset | `task, source_audio, desc, target_audio` | `prepare --dataset HKUSTAudio/AudioEdit` |
+
+**`prompts.sample.jsonl` 只用于冒烟**（10 条手写样本），不是 benchmark 数据，不能用来出指标。
+另外 AudioCaps/MusicCaps 的音频（YouTube 源）需要单独获取，`--ref` 指向真实测试音频目录才能算 FAD。
+
 ## 三步流程（以 AudioCaps 为例）
 
 > 仓库**不自带** benchmark 提示词。先用 `prompts.sample.jsonl`（10 条）打通链路，

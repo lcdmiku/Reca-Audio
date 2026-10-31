@@ -26,6 +26,18 @@ from common import audio_io, generation, metrics  # noqa: E402
 def cmd_prepare(args: argparse.Namespace) -> int:
     from common import datasets
 
+    if args.csv:
+        # 官方发布格式：musiccaps-public.csv (ytid, start_s, end_s, caption, ...)
+        datasets.export_from_csv(
+            args.csv,
+            args.out_jsonl,
+            prompt_col=args.prompt_field,
+            id_col=args.id_col,
+            id_suffix_cols=args.id_suffix_cols,
+            limit=args.limit,
+        )
+        return 0
+
     datasets.try_export(
         [args.dataset] if args.dataset else [
             "google/MusicCaps",
@@ -76,6 +88,11 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("prepare")
+    p.add_argument("--csv", default=None,
+                   help="官方发布的 musiccaps-public.csv（ytid, start_s, end_s, caption, ...）")
+    p.add_argument("--id-col", default="ytid")
+    p.add_argument("--id-suffix-cols", nargs="*", default=["start_s"],
+                   help="拼进 id 的列，避免同一 ytid 的多个片段重名")
     p.add_argument("--dataset", default=None)
     p.add_argument("--split", default="train")
     p.add_argument("--prompt-field", default="caption")

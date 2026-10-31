@@ -102,3 +102,48 @@ def try_export(candidates: List[str], **kwargs) -> List[dict]:
         "所有候选数据集都不可用，请显式指定 --dataset，或手工准备统一格式的 jsonl。\n"
         f"最后一个错误：{last}"
     )
+
+
+def export_from_csv(
+    csv_path: str,
+    out: str,
+    prompt_col: str = "caption",
+    id_col: Optional[str] = None,
+    id_suffix_cols: Optional[List[str]] = None,
+    limit: int = 0,
+) -> List[dict]:
+    """从官方发布的 csv 导出统一 jsonl（AudioCaps / MusicCaps 等）。
+
+    AudioCaps 的 test.csv 列：audiocap_id, youtube_id, start_time, caption
+    MusicCaps 的 musiccaps-public.csv 列：ytid, start_s, end_s, caption, ...
+    """
+    import csv
+    import json
+
+    keep_cols = ("youtube_id", "ytid", "start_time", "start_s", "end_s")
+    rows: List[dict] = []
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if prompt_col not in (reader.fieldnames or []):
+            raise SystemExit(
+                f"[fatal] csv 里没有列 {prompt_col!r}；实际列：{reader.fieldnames}\n"
+                "  用 --prompt-col 指定正确的列名。"
+            )
+        for i, row in enumerate(reader):
+            if limit and i >= limit:
+                break
+            base = row.get(id_col) if id_col else f"{i:05d}"
+            suffix = "_".join(str(row.get(c, "")).replace(".", "p") for c in (id_suffix_cols or []))
+            rid = f"{base}_{suffix}".strip("_") if suffix else str(base)
+            item = {"id": rid, "prompt": row[prompt_col]}
+            for col in keep_cols:
+                if col in row:
+                    item[col] = row[col]
+            rows.append(item)
+
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"[export] {len(rows)} 条 -> {out}")
+    return rows
