@@ -103,6 +103,12 @@ fi
 
 export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
+# 分片数不超过样本数，否则会白起一堆进程、各自加载一遍模型（还容易把 HF 镜像打爆）
+N_ITEMS=$(grep -cve '^[[:space:]]*$' "${INPUT}" || true)
+if (( N_ITEMS > 0 && NUM_SHARDS > N_ITEMS )); then
+  NUM_SHARDS="${N_ITEMS}"
+fi
+
 echo "============================================================"
 echo " benchmark   : ${BENCH}  (${CMD})"
 echo " input       : ${INPUT}"

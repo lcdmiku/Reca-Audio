@@ -1,6 +1,33 @@
 import json
+from pathlib import Path
+
+
+def _path_bases():
+    """相对路径的可能基准：当前工作目录 + 包根目录（Audio-Omni/）。"""
+    pkg_root = Path(__file__).resolve().parents[2]
+    return [Path.cwd(), pkg_root]
+
+
+def _resolve_config_paths(node, bases):
+    """把配置里的 ./xxx 解析成绝对路径。
+
+    上游写的是 './audio_omni/data/vocab.txt'，只有 cwd 在 Audio-Omni/ 里才对；
+    从仓库根目录启动（benchmark、批处理）就会 FileNotFoundError。
+    """
+    if isinstance(node, dict):
+        return {k: _resolve_config_paths(v, bases) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_resolve_config_paths(v, bases) for v in node]
+    if isinstance(node, str) and node.startswith(("./", "../")):
+        for base in bases:
+            candidate = (base / node).resolve()
+            if candidate.exists():
+                return str(candidate)
+    return node
+
 
 def create_model_from_config(model_config):
+    model_config = _resolve_config_paths(model_config, _path_bases())
     model_type = model_config.get('model_type', None)
 
     assert model_type is not None, 'model_type must be specified in model config'
