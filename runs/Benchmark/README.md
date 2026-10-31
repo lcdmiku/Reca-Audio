@@ -72,34 +72,52 @@ benchmark 的提示词随数据集发布，`prepare` 优先读官方文件：
 **`prompts.sample.jsonl` 只用于冒烟**（10 条手写样本），不是 benchmark 数据，不能用来出指标。
 另外 AudioCaps/MusicCaps 的音频（YouTube 源）需要单独获取，`--ref` 指向真实测试音频目录才能算 FAD。
 
-## 三步流程（以 AudioCaps 为例）
-
-> 仓库**不自带** benchmark 提示词。先用 `prompts.sample.jsonl`（10 条）打通链路，
-> 再 `prepare` 导出完整测试集。`score` 需要真实参考音频，没有数据集时只能跑 `gen`。
+## 一键跑
 
 ```bash
-# 0) 冒烟：2 条样本，确认能出声
-python runs/Benchmark/AudioCaps/evaluate.py gen \
-  --prompts runs/Benchmark/AudioCaps/prompts.sample.jsonl \
-  --out runs/Benchmark/_runs/audiocaps_smoke --limit 2 \
-  --model-config Audio-Omni/model/Audio-Omni.json --ckpt Audio-Omni/model/model.ckpt \
-  --device cuda:0 --cond-device cuda:1 --dtype float16 --steps 30
+bash runs/Benchmark/run_shards.sh --benchmark AudioCaps
 ```
 
+只给 benchmark 名，其余全走默认值：
+
+| 项 | 默认 |
+|---|---|
+| 模型 | `Audio-Omni/model/Audio-Omni.json` + `model.ckpt` |
+| 精度 | `float16` |
+| 卡 | 每进程 2 卡（主干 `cuda:0`、理解塔 `cuda:1`），按可见卡数自动分片 |
+| 采样 | 100 步、CFG=6.0（论文设置） |
+| 输入 | `<benchmark>/prompts.jsonl`，没有就退回 `prompts.sample.jsonl`（会警告） |
+| 输出 | `runs/Benchmark/output/<benchmark>/` |
+| 收尾 | 自动 `merge`；AudioEdit/TTS 自动 `score`，AudioCaps/MusicCaps 需要 `REF` |
+
+常用覆盖（都是环境变量）：
+
 ```bash
-# 1) 生成（8 卡 → 4 个分片，每片 2 卡：主干 cuda:0、理解塔 cuda:1）
-GPUS_PER_PROC=2 bash runs/Benchmark/run_shards.sh runs/Benchmark/AudioCaps/evaluate.py 4 \
+# 冒烟：2 条、30 步、单卡
+LIMIT=2 STEPS=30 GPUS_PER_PROC=1 bash runs/Benchmark/run_shards.sh --benchmark AudioCaps
+
+# 正式：8 卡 → 4 片 × 2 卡，跑完自动算 FAD
+REF=/data/audiocaps_test_audio GPUS_PER_PROC=2 \
+  bash runs/Benchmark/run_shards.sh --benchmark AudioCaps
+
+# 指定输入/输出
+INPUT=/path/prompts.jsonl OUT=/tmp/run1 \
+  bash runs/Benchmark/run_shards.sh --benchmark MusicCaps
+```
+
+`run_shards.sh` 自己会传 `--device` / `--cond-device`，调用方不用管。
+
+### 手动三步（调试单个分片时用）
+
+```bash
+python runs/Benchmark/AudioCaps/evaluate.py gen \
   --prompts runs/Benchmark/AudioCaps/prompts.jsonl \
-  --out runs/Benchmark/_runs/audiocaps \
+  --out runs/Benchmark/output/AudioCaps --limit 2 \
   --model-config Audio-Omni/model/Audio-Omni.json --ckpt Audio-Omni/model/model.ckpt \
-  --dtype float16 --steps 100 --cfg 6.0
+  --device cuda:0 --cond-device cuda:1 --dtype float16 --steps 30
 
-# 2) 合并分片清单
-python runs/Benchmark/AudioCaps/evaluate.py merge --out runs/Benchmark/_runs/audiocaps
-
-# 3) 打分（需要 AudioCaps test 的真实音频目录）
-python runs/Benchmark/AudioCaps/evaluate.py score \
-  --out runs/Benchmark/_runs/audiocaps --ref /data/audiocaps_test_audio
+python runs/Benchmark/AudioCaps/evaluate.py merge --out runs/Benchmark/output/AudioCaps
+python runs/Benchmark/AudioCaps/evaluate.py score --out runs/Benchmark/output/AudioCaps --ref /data/audiocaps_test_audio
 ```
 
 ### 显存与分片怎么选
@@ -112,8 +130,7 @@ python runs/Benchmark/AudioCaps/evaluate.py score \
 `run_shards.sh` 会强制设置 `--device cuda:0` 和 `--cond-device cuda:0/1`，所以调用方不用再传这两个参数；
 传了也会被脚本覆盖。
 
-理解类（MMSU/MMAU）把 `gen/score` 换成 `eval/merge`，编辑类把 `merge` 后的 `score` 直接打在
-`manifest.jsonl` 上（`target_audio` 就在 items 里）。
+理解类（MMSU/MMAU）会自动走 `eval` + `merge`；编辑类（AudioEdit）和 TTS 在 `merge` 后自动 `score`。
 
 ## 依赖
 
