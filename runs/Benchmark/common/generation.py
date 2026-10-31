@@ -105,7 +105,17 @@ def run_generation(args, task: str = "T2A") -> int:
     t0 = time.time()
     with manifest_path.open("w", encoding="utf-8") as f:
         for i, item in enumerate(prompts, 1):
-            rec = {"id": item.get("id", f"{i:05d}"), "prompt": item["prompt"], "task": task}
+            rec = {
+                "id": item.get("id", f"{i:05d}"),
+                "prompt": item["prompt"],
+                "task": task,
+                # 让输出自解释：拿到一个 wav 目录就能知道是用什么设置生成的
+                "steps": args.steps,
+                "cfg": args.cfg,
+                "seconds": args.seconds,
+                "dtype": args.dtype,
+                "ckpt": Path(args.ckpt).name,
+            }
             t_start = time.time()
             try:
                 if args.no_build:

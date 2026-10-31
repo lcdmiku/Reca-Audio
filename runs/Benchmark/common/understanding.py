@@ -36,19 +36,52 @@ def _normalize(text: str) -> str:
     return text
 
 
+def parse_choice(text: str, choices: List[str]) -> int | None:
+    """从自由文本里解析出选项下标（MMSU/MMAU 官方口径是按选项判分）。"""
+    if not choices:
+        return None
+    t = (text or "").strip().lower()
+    # 1) 以字母开头，如 "A" / "A." / "(b)" / "c:"
+    m = re.match(r"^[\s\(\[]*([a-z])[\s\)\].:：]", t)
+    if m:
+        idx = ord(m.group(1)) - ord("a")
+        if 0 <= idx < len(choices):
+            return idx
+    # 2) 整句只回了一个字母
+    m = re.fullmatch(r"[\s\(\[]*([a-z])[\s\)\].]*", t)
+    if m:
+        idx = ord(m.group(1)) - ord("a")
+        if 0 <= idx < len(choices):
+            return idx
+    # 3) 回的是选项原文（取匹配到的最长选项，避免 "cat" 命中 "caterpillar"）
+    norm_t = _normalize(t)
+    best, best_len = None, 0
+    for i, choice in enumerate(choices):
+        cn = _normalize(choice)
+        if cn and cn in norm_t and len(cn) > best_len:
+            best, best_len = i, len(cn)
+    return best
+
+
 def is_correct(pred: str, answer: str, choices: List[str] | None = None) -> bool:
-    """宽松匹配：完全一致 / 参考答案包含在预测里 / 选项字母一致。"""
+    """判分：有选项时先按选项下标比，否则回退到宽松文本匹配。"""
     p, a = _normalize(pred), _normalize(answer)
     if not a:
         return False
+
+    if choices:
+        gold = None
+        for i, choice in enumerate(choices):
+            if _normalize(choice) == a:
+                gold = i
+                break
+        if gold is not None:
+            pred_idx = parse_choice(pred, choices)
+            if pred_idx is not None:
+                return pred_idx == gold
+
     if p == a or a in p:
         return True
-    # 选项题：模型可能只回字母
-    if choices:
-        for i, choice in enumerate(choices):
-            letter = chr(ord("A") + i)
-            if _normalize(choice) == a and p.strip() == letter.lower():
-                return True
     return False
 
 
