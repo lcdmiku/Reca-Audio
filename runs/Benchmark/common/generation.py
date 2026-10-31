@@ -42,7 +42,16 @@ def add_gen_args(ap: argparse.ArgumentParser) -> None:
 def load_prompts(path: str) -> List[dict]:
     p = Path(path)
     if not p.exists():
-        raise SystemExit(f"[fatal] 提示词文件不存在：{path}")
+        raise SystemExit(
+            f"[fatal] 提示词文件不存在：{path}\n"
+            "  仓库不自带 benchmark 提示词，三种来源：\n"
+            "    1) 先用样本打通生成链路：\n"
+            "         --prompts runs/Benchmark/AudioCaps/prompts.sample.jsonl\n"
+            "         --prompts runs/Benchmark/MusicCaps/prompts.sample.jsonl\n"
+            "    2) 从 HF 数据集导出完整测试集：\n"
+            "         python runs/Benchmark/AudioCaps/evaluate.py prepare --out-jsonl <path>\n"
+            "    3) 自己写 jsonl，每行 {\"id\": \"00001\", \"prompt\": \"...\"}"
+        )
     if p.suffix == ".jsonl":
         rows = []
         for line in p.read_text(encoding="utf-8").splitlines():

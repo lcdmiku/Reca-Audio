@@ -59,6 +59,18 @@ HF 上的数据集可以用各自的 `prepare` 子命令导出；数据集 id �
 
 ## 三步流程（以 AudioCaps 为例）
 
+> 仓库**不自带** benchmark 提示词。先用 `prompts.sample.jsonl`（10 条）打通链路，
+> 再 `prepare` 导出完整测试集。`score` 需要真实参考音频，没有数据集时只能跑 `gen`。
+
+```bash
+# 0) 冒烟：2 条样本，确认能出声
+python runs/Benchmark/AudioCaps/evaluate.py gen \
+  --prompts runs/Benchmark/AudioCaps/prompts.sample.jsonl \
+  --out runs/Benchmark/_runs/audiocaps_smoke --limit 2 \
+  --model-config Audio-Omni/model/Audio-Omni.json --ckpt Audio-Omni/model/model.ckpt \
+  --device cuda:0 --cond-device cuda:1 --dtype float16 --steps 30
+```
+
 ```bash
 # 1) 生成（8 卡 → 4 个分片，每片 2 卡：主干 cuda:0、理解塔 cuda:1）
 GPUS_PER_PROC=2 bash runs/Benchmark/run_shards.sh runs/Benchmark/AudioCaps/evaluate.py 4 \
