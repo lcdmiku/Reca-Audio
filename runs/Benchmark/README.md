@@ -65,8 +65,8 @@ benchmark 的提示词随数据集发布，`prepare` 优先读官方文件：
 |---|---|---|---|
 | AudioCaps | `test.csv` | `audiocap_id, youtube_id, start_time, caption` | `prepare --csv test.csv --id-col audiocap_id --prompt-col caption` |
 | MusicCaps | `musiccaps-public.csv` | `ytid, start_s, end_s, caption` | `prepare --csv musiccaps-public.csv --id-col ytid --id-suffix-cols start_s` |
-| MMSU | HF dataset | `question, answer, choices, audio` | `prepare --dataset <id>` |
-| MMAU | HF dataset | 同上 | `prepare --dataset <id>` |
+| MMSU | HF `ddwang2000/MMSU` | `category, sub-category, question, choice_a..d, answer_gt, audio` | `prepare`（默认 id） |
+| MMAU | HF `gamma-lab-umd/MMAU-test-mini` | `question, choices, answer, task, difficulty, audio` | `prepare`（默认 id） |
 | AudioEdit | HF dataset | `task, source_audio, desc, target_audio` | `prepare --dataset HKUSTAudio/AudioEdit` |
 
 **`prompts.sample.jsonl` 只用于冒烟**（10 条手写样本），不是 benchmark 数据，不能用来出指标。
