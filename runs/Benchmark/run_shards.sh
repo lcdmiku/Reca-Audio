@@ -154,7 +154,7 @@ echo "[run] shards finished (status=${status})"
 if (( status == 0 )); then
   python "${SCRIPT}" merge --out "${OUT}" || echo "[warn] merge 失败，忽略"
   case "${BENCH}" in
-    AudioEdit|TTS)
+    AudioEdit|TTS|MMSU|MMAU)
       python "${SCRIPT}" score --out "${OUT}" || echo "[warn] score 失败"
       ;;
     AudioCaps|MusicCaps)
