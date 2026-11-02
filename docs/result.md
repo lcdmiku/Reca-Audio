@@ -117,9 +117,53 @@ python runs/Benchmark/MMAU/evaluate.py prepare --parquet runs/Benchmark/_data/hf
 bash runs/Benchmark/run_shards.sh --benchmark MMAU
 ```
 
-## 7. 下一步
+## 7. UltraEval-Audio（统一评测框架，已接入）
+
+上游：https://github.com/OpenBMB/UltraEval-Audio（ACL 2026 demo），按官方
+`docs/how eval your model.md` 接入。
+
+### 接入方式
+
+| 文件 | 内容 |
+|---|---|
+| `audio_evals/models/audio_omni.py` | 适配器：prompt 里的 audio → `AudioOmni.understand()` |
+| `registry/model/audio_omni.yaml` | 注册 `--model audio-omni`（模型路径 + 双卡） |
+| `INTEGRATION.md` | 接入说明与补丁记录 |
+
+仓库用**稀疏检出**（完整 checkout 在 Windows 上因 `lib/Kimi-Audio/...` 路径过深失败），
+只保留框架代码与 registry，未包含各模型私有实现。
+
+### 验证
+
+```bash
+cd runs/Benchmark/UltraEval-Audio
+python audio_evals/main.py --dataset sample --model audio-omni --limit 2
+```
+
+结果：`{'wer(%)': 82.76, 'fail_rate(%)': 0.0}`
+
+- 第 0 条 CER 0%（输出与参考一致）；
+- 第 1 条 CER 184%——模型在答案后追加对话文字，属于提示词遵循问题；
+- 结果文件：`res/audio-omni/sample/<时间>.jsonl`。
+
+### 环境补丁（重要）
+
+| 问题 | 处理 |
+|---|---|
+| 环境是 `datasets==2.14.7`，框架要求 3.6.0 | `huggingface.py` 加 `trust_remote_code` 回退 |
+| `jiwer` 4.x 删了 `compute_measures` | 降到 `jiwer==2.6.0` |
+| `sacrebleu` 2.x 无 `TOKENIZERS` | 降到 `sacrebleu==1.5.1`（`--no-deps`） |
+| `pycocotools` 需编译 | `coco.py` 惰性导入，仅 caption 指标不可用 |
+
+### 已知限制
+
+- `librispeech-test-clean` 等真实数据集需从 HF 下载，hf-mirror 偶发超时（本次失败）；
+- UltraEval 的评分口径与我们 `runs/Benchmark/MMSU` 的官方脚本**不同，不可混用**。
+
+## 8. 下一步
 
 1. 给生成类补齐 PANNs / VGGish 指标后端，并拿到 AudioCaps/MusicCaps 音频；
 2. 给 AudioEdit / TTS 准备 items.jsonl；
 3. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
-4. 修 RecA 相关实验：在这两个 benchmark 上对比 base / RecA 后训练。
+4. 用 UltraEval-Audio 跑通一个 ASR 数据集（需先解决镜像下载超时）；
+5. 修 RecA 相关实验：在这两个 benchmark 上对比 base / RecA 后训练。
