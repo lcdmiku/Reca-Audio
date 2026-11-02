@@ -1,8 +1,8 @@
 # 评测结果
 
-> 所有结果均由 `runs/Benchmark/` 下的脚本在服务器 `Reca` 上实测产生，
-> 原始文件在 `runs/Benchmark/output/<benchmark>/`（服务器侧，不入库）。
-> 与论文数字的可比性单独标注，**不要把不同协议的分数并排比较**。
+> 全部数字由 `runs/Benchmark/` 下的脚本在服务器 `Reca` 上实测产生。
+> 原始产物在服务器 `runs/Benchmark/output/<benchmark>/`（数据与权重不入库）。
+> **不同协议/提示词的分数不可并排比较**，每条结果都标注了可比性。
 
 ## 0. 环境
 
@@ -11,113 +11,115 @@
 | 主机 | `210.28.133.13:22869`（Ubuntu 22.04，40 核 / 472 GB） |
 | GPU | 8 × Tesla V100-SXM2-32GB（sm70） |
 | 环境 | conda `audio-omni`：torch 2.6.0+cu124 / transformers 4.57.3 / numpy 1.23.5 |
-| 模型 | `Audio-Omni/model/model.ckpt`（21 GB），DiT fp16，理解塔 cuda:1 |
-| 推理 | 理解类贪心解码；生成类 100 步 ODE、CFG=6.0（论文设置） |
+| 模型 | `Audio-Omni/model/model.ckpt`（21 GB），DiT fp16 |
+| 并行 | 组件并行（DiT+VAE 在 cuda:0，Qwen 理解塔在 cuda:1）+ 进程分片 |
 
-显存实测（双卡组件并行）：
+实测显存：
 
 ```
 [loader] cuda:0 allocated=6.70GB    # DiT fp16 + VAE
-[loader] cuda:1 allocated=18.94GB   # Qwen2.5-Omni-3B 理解塔（fp32）
+[loader] cuda:1 allocated=18.94GB   # Qwen2.5-Omni-3B（fp32）
 ```
 
----
+## 1. MMSU（理解，全量 5000 条）
 
-## 1. MMSU（理解）
-
-- **协议**：官方 `mmsu_evaluation.py` 判分规则（首字母 / 倒数第二字符），
-  无法解析的回复不计入分母。
-- **数据**：HF `ddwang2000/MMSU` 的 shard 0（1667 条），**200 条分层抽样**（stride=5）。
-- **提示词**：四选一、要求只回字母（官方 inference 模板未公开，详见下方差异说明）。
+- **数据**：HF `ddwang2000/MMSU` 全部 3 个 parquet 分片（1667+1667+1666 = 5000）。
+- **判分**：复刻官方 `mmsu_evaluation.py`（首字母 / 倒数第二字符；无法解析不计入分母）。
+- **提示词**：四选一、要求只回字母（官方 inference 模板未公开）。
 
 | 维度 | 准确率 | n |
 |---|---|---|
-| **Overall** | **68.00 %** | 200 |
-| Perception | 48.28 % | 87 |
-| — Linguistics | 40.91 % | — |
-| — Paralinguistics | 71.43 % | — |
-| Reasoning | 83.19 % | 113 |
-| — Linguistics | 83.19 % | — |
+| **Overall** | **59.70 %** | 5000 |
+| Perception | 43.06 % | 2580 |
+| — Linguistics | 46.18 % | — |
+| — Paralinguistics | 38.22 % | — |
+| Reasoning | 77.44 % | 2420 |
+| — Linguistics | 83.07 % | — |
+| — Paralinguistics | 42.39 % | — |
 
-未解析回复：0 条。
+未解析回复：0 条。耗时：约 13 分钟（4 分片 × 2 卡）。
 
-### 与论文的差异（重要）
+### 与论文对比
 
-| 项 | 论文 | 本次 |
+| | 论文（Audio-Omni） | 本次 |
 |---|---|---|
-| Audio-Omni MMSU | **56.83** | 68.00 |
-| 数据范围 | 全部 5000 条 | shard 0 前 1667 条中抽 200 |
-| 提示词 | 未公开（各家自接模型） | 自定四选一模板 |
+| MMSU | 56.83 | **59.70** |
+| Perception / Reasoning | 42.37 / 72.76（Qwen2.5-Omni-3B 行） | 43.06 / 77.44 |
 
-**结论：这个 68.00 不能当作复现论文的 56.83。** 差异来源按可能性排序：
+差 +2.9 个点，主要来自提示词差异（我们要求“只回字母”，判分更容易命中）与解码差异；
+**数据是全集，这一点是可比的**。
 
-1. **子集偏差**：只覆盖 shard 0，任务分布与全集不同；
-2. **提示词不同**：我们明确要求"只回字母"，更容易被判分规则解析，也可能提升答题率；
-3. 论文的数字来自他们自己的 inference 脚本。
+## 2. MMAU（理解，test-mini 1000 条）
 
-要得到可比数字，必须跑满 5000 条并使用同一提示词——目前只下载了 1/3 的分片。
+- **数据**：HF `gamma-lab-umd/MMAU-test-mini`（`test_mini.parquet`，1000 条带答案）。
+- **判分**：复刻官方 `evaluation.py` 的 token 集合匹配（答案 token 全覆盖 + 不含错误选项独有 token）。
+- **提示词**：要求“只输出选项标签+原文，不要解释”（必须，否则长解释会带进错误选项 token）。
 
-### 复现命令
+| 维度 | 准确率 | n |
+|---|---|---|
+| **Overall** | **57.70 %** | 1000 |
+| sound | 66.97 % | 333 |
+| speech | 55.56 % | 333 |
+| music | 50.60 % | 334 |
+| easy / medium / hard | 57.59 / 61.67 / 48.73 | 224 / 540 / 236 |
 
-```bash
-cd ~/Reca-Audio
-PY=~/miniconda3/envs/audio-omni/bin/python
-export HF_ENDPOINT=https://hf-mirror.com
+无预测：0 条。耗时：约 6 分钟（4 分片 × 2 卡）。
 
-$PY runs/Benchmark/MMSU/evaluate.py prepare \
-  --parquet runs/Benchmark/_data/hf/mmsu_train0.parquet --limit 200 --stride 5
-$PY runs/Benchmark/MMSU/evaluate.py eval \
-  --items runs/Benchmark/MMSU/items.jsonl --out runs/Benchmark/output/MMSU \
-  --device cuda:0 --cond-device cuda:1 --dtype float16
-$PY runs/Benchmark/MMSU/evaluate.py merge --out runs/Benchmark/output/MMSU
-$PY runs/Benchmark/MMSU/evaluate.py score --out runs/Benchmark/output/MMSU
-```
+### 与论文对比
 
-耗时：模型加载 ≈ 1.5 min，推理 200 条 ≈ 1.5 min。
+| | 论文（Audio-Omni） | 本次 |
+|---|---|---|
+| MMAU | 63.30 | **57.70** |
 
----
+**不可直接比**，两点差异：
 
-## 2. MMAU（理解）
+1. 我们只能跑公开答案的 **test-mini（1000 条）**，论文的 63.30 大概率是完整 test（9000 条，答案不公开）；
+2. 提示词不同。
 
-- 数据已下载（`runs/Benchmark/_data/hf/mmau_test_mini.parquet`，1.2 GB / 1000 条），
-  schema 已确认：`context{bytes,path} / instruction / choices / answer / other_attributes`。
-- **尚未运行**：`prepare` 目前只走 HF 流式加载，尚未加本地 parquet 分支（MMSU 已加）。
-- 参考：论文 Audio-Omni MMAU = **63.30**。
-
----
+值得记录的中间现象：同一批 100 条，**宽松提示词（允许解释）只有 24%，改成“只输出标签+原文”后升到 72%**——
+说明这套 token 匹配判分对输出格式极其敏感，任何对比都必须注明提示词。
 
 ## 3. 生成类（AudioCaps / MusicCaps）
 
-- 代码就绪，**缺数据**：需要官方 `test.csv` + 真实测试音频（FAD 的参考分布）。
-- 指标后端未装：论文用 PANNs（KL/IS/FAD/FD），当前默认 CLAP-FAD，**不可比**。
-- 参考：论文 T2A_FAD 1.86、T2M_FAD 1.94。
+- 代码就绪，**缺数据**：需要官方 test caption + 真实测试音频（FAD 的参考分布）。
+- 指标后端未装：论文用 PANNs 的 KL/IS/FAD/FD，当前默认 CLAP-FAD，**不可比**。
+- 论文参考：T2A_FAD 1.86、T2M_FAD 1.94。
 
-## 4. 编辑类（AudioEdit）
+## 4. 编辑类（AudioEdit）与 TTS（Seed-TTS en）
 
-- 代码就绪，**缺数据**（HF `HKUSTAudio/AudioEdit`）。
-- 参考：论文 AE_FAD 3.27 / AE_LSD 2.27 / CLAP 0.32。
+- 代码就绪，**缺数据**；TTS 的 WER 还需 Whisper（当前默认 small，论文用 large 级）。
+- 论文参考：AE_FAD 3.27 / AE_LSD 2.27 / CLAP 0.32；TTS_WER 1.77。
 
-## 5. TTS（Seed-TTS en）
+## 5. 状态总览
 
-- 代码就绪，**缺数据**；WER 需要 Whisper（当前默认 small，论文用 large 级）。
-- 参考：论文 TTS_WER 1.77。
+| Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
+|---|---|---|---|---|
+| MMSU | ✅ 全量 5000 | **59.70 %** | 56.83 | 数据可比，提示词不同 |
+| MMAU | ✅ test-mini 1000 | **57.70 %** | 63.30 | 子集 + 提示词不同 |
+| AudioCaps | ⛔ 缺数据/指标后端 | — | FAD 1.86 | — |
+| MusicCaps | ⛔ 缺数据/指标后端 | — | FAD 1.94 | — |
+| AudioEdit | ⛔ 缺数据 | — | AE_FAD 3.27 | — |
+| TTS | ⛔ 缺数据 | — | WER 1.77 | — |
 
----
+## 6. 复现命令
 
-## 6. 状态总览
+```bash
+cd ~/Reca-Audio
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate audio-omni
+export QWEN_OMNI_MODEL_PATH=$(ls -d ~/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots/*/ | head -1)
 
-| Benchmark | 状态 | 结果 | 可复现论文？ |
-|---|---|---|---|
-| MMSU | ✅ 已跑（200 条子集） | 68.00 % | 否（子集 + 提示词不同） |
-| MMAU | ⏳ 数据已下，待接入 | — | — |
-| AudioCaps | ⛔ 缺数据/指标后端 | — | 否 |
-| MusicCaps | ⛔ 缺数据/指标后端 | — | 否 |
-| AudioEdit | ⛔ 缺数据 | — | 否 |
-| TTS | ⛔ 缺数据 | — | 否 |
+# MMSU
+python runs/Benchmark/MMSU/evaluate.py prepare --parquet "runs/Benchmark/_data/hf/mmsu_train*.parquet"
+bash runs/Benchmark/run_shards.sh --benchmark MMSU
+
+# MMAU
+python runs/Benchmark/MMAU/evaluate.py prepare --parquet runs/Benchmark/_data/hf/mmau_test_mini.parquet
+bash runs/Benchmark/run_shards.sh --benchmark MMAU
+```
 
 ## 7. 下一步
 
-1. 下载 MMSU shard 1–2，跑满 5000 条，替换本文档中的子集数字；
-2. 给 MMAU `prepare` 加本地 parquet 分支，跑 test-mini 1000 条；
-3. 装 `panns-inference` / `fadtk`，把生成类指标对齐论文口径；
-4. 拿到 AudioCaps/MusicCaps 音频后再开生成类评测。
+1. 给生成类补齐 PANNs / VGGish 指标后端，并拿到 AudioCaps/MusicCaps 音频；
+2. 给 AudioEdit / TTS 准备 items.jsonl；
+3. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
+4. 修 RecA 相关实验：在这两个 benchmark 上对比 base / RecA 后训练。

@@ -37,11 +37,15 @@ from common import audio_io, generation  # noqa: E402
 
 
 def build_prompt(item: dict) -> str:
-    """官方判分按 token 匹配，答案里带 "(A)"，所以要求模型把选项标签一起复述。"""
+    """官方判分按 token 匹配：答案带 "(A)"，且不能出现错误选项的词。
+
+    所以必须逼模型只输出「标签 + 选项原文」，任何解释都会带进错误选项的 token。
+    """
     choices = item.get("choices") or []
     lines = [
-        "Listen to the audio and answer the question.",
-        "Reply with the option exactly as listed, including its letter, e.g. (A) Man.",
+        "Listen to the audio and answer the multiple-choice question.",
+        "Output ONLY the option label and its text, exactly as listed. Do not explain.",
+        "Example format: (A) Man",
         "",
         f"Question: {item.get('question', '')}",
         "Options:",
