@@ -58,7 +58,90 @@ def build_prompt(item: dict) -> str:
 # ----------------------------------------------------------------------
 # prepare
 # ----------------------------------------------------------------------
+def _write_wav_from_bytes(data: bytes, dst: Path) -> bool:
+    """parquet 里的 audio 是 struct{bytes,path}；bytes 既可能是原始 wav，也可能是编码音频。"""
+    import io
+
+    import soundfile as sf
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if data[:4] == b"RIFF":
+            dst.write_bytes(data)
+            return True
+        arr, sr = sf.read(io.BytesIO(data))
+        sf.write(str(dst), arr, int(sr), subtype="PCM_16")
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"[prepare] 写音频失败 {dst.name}: {type(e).__name__}: {e}")
+        return False
+
+
+def _prepare_from_parquet(args: argparse.Namespace) -> int:
+    """直接读本地 parquet，比走 datasets 的网络流式加载快得多。"""
+    import glob
+
+    import pyarrow.parquet as pq
+
+    files = []
+    for pattern in args.parquet.split(","):
+        files.extend(sorted(glob.glob(pattern.strip())))
+    if not files:
+        raise SystemExit(f"[fatal] 没找到 parquet：{args.parquet}")
+
+    audio_dir = Path(args.audio_dir)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    want = args.limit if args.limit else 10**9
+
+    rows = []
+    for path in files:
+        if len(rows) >= want:
+            break
+        pf = pq.ParquetFile(path)
+        cols = [args.id_field, args.question_field, "choice_a", "choice_b", "choice_c",
+                "choice_d", args.answer_field, "category", "sub-category", args.audio_field]
+        table = pf.read_row_group(0, columns=cols)
+        take = min(table.num_rows, want - len(rows))
+        print(f"[prepare] {Path(path).name}: {table.num_rows} 行，取 {take}")
+        for i in range(take):
+            rec = {c: table.column(c)[i].as_py() for c in cols}
+            item_id = str(rec.get(args.id_field) or f"{len(rows):05d}")
+            audio = rec.get(args.audio_field) or {}
+            data = audio.get("bytes") if isinstance(audio, dict) else None
+            if not data:
+                print(f"[prepare] {item_id} 无音频 bytes，跳过")
+                continue
+            dst = audio_dir / f"{item_id}.wav"
+            if not _write_wav_from_bytes(data, dst):
+                continue
+            rows.append({
+                "id": item_id,
+                "category": rec.get("category", ""),
+                "sub-category": rec.get("sub-category", ""),
+                "question": rec.get(args.question_field, ""),
+                "choice_a": rec.get("choice_a", ""),
+                "choice_b": rec.get("choice_b", ""),
+                "choice_c": rec.get("choice_c", ""),
+                "choice_d": rec.get("choice_d", ""),
+                "answer_gt": rec.get(args.answer_field, ""),
+                "audio": str(dst),
+            })
+
+    out = Path(args.out_jsonl)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"[prepare] {len(rows)} 条 -> {out}（来源：本地 parquet）")
+    if rows:
+        print(f"[prepare] 示例：{rows[0]['category']} / {rows[0]['question'][:70]!r}")
+    return 0
+
+
 def cmd_prepare(args: argparse.Namespace) -> int:
+    if args.parquet:
+        return _prepare_from_parquet(args)
+
     from datasets import load_dataset
 
     from common.datasets import _save_audio_value
@@ -240,6 +323,8 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("prepare")
+    p.add_argument("--parquet", default=None,
+                   help="本地 parquet（可逗号分隔/通配），优先于 --dataset；音频内嵌在 bytes 里")
     p.add_argument("--dataset", default="ddwang2000/MMSU")
     p.add_argument("--split", default="test")
     p.add_argument("--id-field", default="id")
