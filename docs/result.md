@@ -157,13 +157,42 @@ python audio_evals/main.py --dataset sample --model audio-omni --limit 2
 
 ### 已知限制
 
-- `librispeech-test-clean` 等真实数据集需从 HF 下载，hf-mirror 偶发超时（本次失败）；
+- 真实数据集需要 `HF_HUB_DOWNLOAD_TIMEOUT` / `HF_HUB_ETAG_TIMEOUT` 调到 300，否则 10 秒超时会误报下载失败；
 - UltraEval 的评分口径与我们 `runs/Benchmark/MMSU` 的官方脚本**不同，不可混用**。
+
+### 基线结果（2026-11-02）
+
+| 数据集 | 指标 | 值 | n | 说明 |
+|---|---|---|---|---|
+| LibriSpeech test-clean | WER | **6.37 %** | 2619 | corpus-level，框架汇总 |
+| LibriSpeech test-clean | 逐条 WER 均值 / 中位数 | 11.44 % / 0.00 | 2619 | 长尾拉高均值 |
+| `sample`（冒烟） | CER/WER | 82.76 % | 2 | 样本太少，仅证明链路 |
+
+细节：
+
+- 27 条 WER > 100，主要是模型在转写后追加“如果还有类似音频…”这类对话尾巴；
+- 102 条输出含对话尾巴，中位数为 0 说明大多数转写完全正确；
+- 无空预测，`fail_rate = 0`。
+
+**参考**：Qwen2.5-Omni 在同类报告里 test-clean 约 2.4%。这里 6.37% 的差距主要来自
+输出格式（模型爱加对话尾巴）而不是识别能力——若把尾部裁掉，逐条均值会显著下降。
+后续做 RecA 对比时，**必须保持同一提示词与同一套后处理**，否则数字不可比。
+
+运行命令：
+
+```bash
+cd runs/Benchmark/UltraEval-Audio
+export HF_ENDPOINT=https://hf-mirror.com HF_HUB_DOWNLOAD_TIMEOUT=300 HF_HUB_ETAG_TIMEOUT=300
+export QWEN_OMNI_MODEL_PATH=$(ls -d ~/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots/*/ | head -1)
+python audio_evals/main.py --dataset librispeech-test-clean --model audio-omni
+```
+
+耗时约 70 分钟（2619 条，单进程，双卡组件并行）。
 
 ## 8. 下一步
 
 1. 给生成类补齐 PANNs / VGGish 指标后端，并拿到 AudioCaps/MusicCaps 音频；
 2. 给 AudioEdit / TTS 准备 items.jsonl；
 3. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
-4. 用 UltraEval-Audio 跑通一个 ASR 数据集（需先解决镜像下载超时）；
+4. 在 UltraEval 上补 test-other / dev-clean，形成完整 ASR 基线；
 5. 修 RecA 相关实验：在这两个 benchmark 上对比 base / RecA 后训练。
