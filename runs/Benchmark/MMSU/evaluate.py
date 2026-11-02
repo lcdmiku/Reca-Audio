@@ -91,7 +91,7 @@ def _prepare_from_parquet(args: argparse.Namespace) -> int:
 
     audio_dir = Path(args.audio_dir)
     audio_dir.mkdir(parents=True, exist_ok=True)
-    want = args.limit if args.limit else 10**9
+    want = args.limit * args.stride if args.limit else 10**9
 
     rows = []
     for path in files:
@@ -137,6 +137,12 @@ def _prepare_from_parquet(args: argparse.Namespace) -> int:
                 "answer_gt": rec.get(args.answer_field, ""),
                 "audio": str(dst),
             })
+
+    # 分层抽样：同一 shard 内任务连续排列，按 stride 取能覆盖更多类别
+    if args.stride > 1:
+        rows = rows[:: args.stride]
+        if args.limit:
+            rows = rows[: args.limit]
 
     out = Path(args.out_jsonl)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -345,6 +351,8 @@ def main() -> int:
     p.add_argument("--audio-dir", default="runs/Benchmark/_data/mmsu_audio")
     p.add_argument("--out-jsonl", default="runs/Benchmark/MMSU/items.jsonl")
     p.add_argument("--limit", type=int, default=0)
+    p.add_argument("--stride", type=int, default=1,
+                   help="按步长抽样（同 shard 内任务连续排列，stride>1 能覆盖更多类别）")
     p.set_defaults(func=cmd_prepare)
 
     e = sub.add_parser("eval")
