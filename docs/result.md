@@ -79,11 +79,45 @@
 值得记录的中间现象：同一批 100 条，**宽松提示词（允许解释）只有 24%，改成“只输出标签+原文”后升到 72%**——
 说明这套 token 匹配判分对输出格式极其敏感，任何对比都必须注明提示词。
 
-## 3. 生成类（AudioCaps / MusicCaps）
+## 3. 生成类：AudioCaps T2A（基线）
 
-- 代码就绪，**缺数据**：需要官方 test caption + 真实测试音频（FAD 的参考分布）。
-- 指标后端未装：论文用 PANNs 的 KL/IS/FAD/FD，当前默认 CLAP-FAD，**不可比**。
-- 论文参考：T2A_FAD 1.86、T2M_FAD 1.94。
+- **数据**：HF 镜像 `TwinkStart/AudioCaps`（Gitee `hf-datasets/OpenSound-AudioCaps` 的 LFS 源），
+  取前 3 个分片中的 **102 条**真实 AudioCaps 片段（caption + 10 s 48 kHz 音频）。
+- **设置**：100 步 ODE、CFG=6.0（论文设置），DiT fp16，理解塔在 cuda:1。
+- **指标**：FAD 建在 **CLAP 嵌入**上（默认后端），另报 CLAP 文本-音频相似度。
+
+| 指标 | 值 | n |
+|---|---|---|
+| **CLAP-FAD ↓** | **0.4535** | 102 生成 / 103 参考 |
+| **CLAP score ↑** | **0.4766** | 102 |
+
+生成耗时：102 条 × 100 步，4 分片 × 2 卡并行，约 **9 分钟**（单条 ~21 s）。
+
+### 可比性（重要）
+
+| 项 | 论文 | 本次 |
+|---|---|---|
+| 数据 | AudioCaps 官方 test（975 条） | 102 条子集（HF 分片取样） |
+| FAD 嵌入 | PANNs / VGGish | **CLAP** |
+| 结果 | T2A_FAD = 1.86 | 0.4535（**不可与 1.86 比较**） |
+
+这个 0.4535 只能作为**同一协议下的相对基线**，用于后续 RecA 后训练模型的前后对比；
+要跟论文对齐，需要官方 975 条 test 音频 + PANNs/VGGish 后端（均未就绪）。
+
+### 复现
+
+```bash
+cd ~/Reca-Audio
+source ~/miniconda3/etc/profile.d/conda.sh && conda activate audio-omni
+export QWEN_OMNI_MODEL_PATH=$(ls -d ~/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots/*/ | head -1)
+export CLAP_CKPT=~/.cache/laion_clap/630k-audioset-best.pt
+
+python runs/Benchmark/AudioCaps/build_subset.py \
+  --shards-dir runs/Benchmark/_data/OpenSound-AudioCaps/data \
+  --pattern "test-*.parquet" --max-items 100
+REF=$PWD/runs/Benchmark/_data/audiocaps/ref GPUS_PER_PROC=2 \
+  bash runs/Benchmark/run_shards.sh --benchmark AudioCaps
+```
 
 ## 4. 编辑类（AudioEdit）与 TTS（Seed-TTS en）
 
@@ -96,7 +130,7 @@
 |---|---|---|---|---|
 | MMSU | ✅ 全量 5000 | **59.70 %** | 56.83 | 数据可比，提示词不同 |
 | MMAU | ✅ test-mini 1000 | **57.70 %** | 63.30 | 子集 + 提示词不同 |
-| AudioCaps | ⛔ 缺数据/指标后端 | — | FAD 1.86 | — |
+| AudioCaps | ✅ 102 条子集 | **CLAP-FAD 0.4535 / CLAP 0.4766** | FAD 1.86 | 子集 + CLAP-FAD，不可比 |
 | MusicCaps | ⛔ 缺数据/指标后端 | — | FAD 1.94 | — |
 | AudioEdit | ⛔ 缺数据 | — | AE_FAD 3.27 | — |
 | TTS | ⛔ 缺数据 | — | WER 1.77 | — |

@@ -54,10 +54,38 @@ _CLAP = None
 def get_clap(device: str = "cuda"):
     global _CLAP
     if _CLAP is None:
+        import os
+
         import laion_clap
+        import torch as _torch
 
         model = laion_clap.CLAP_Module(enable_fusion=False, device=device)
-        model.load_ckpt()
+        ckpt = os.environ.get("CLAP_CKPT")
+        if ckpt:
+            # laion_clap 内部的 torch.load 未传 weights_only，torch>=2.6 默认 True 会报错；
+            # 权重来自官方 repo 的镜像，这里显式放开（仅在此调用期间）。
+            _orig_load = _torch.load
+
+            def _patched_load(*args, **kwargs):
+                kwargs.setdefault("weights_only", False)
+                return _orig_load(*args, **kwargs)
+
+            _torch.load = _patched_load
+            # 官方 CLAP ckpt 多一个 text_branch.embeddings.position_ids（buffer），
+            # strict=True 会报 unexpected key；这里在加载期间放宽。
+            _orig_lsd = _torch.nn.Module.load_state_dict
+
+            def _patched_lsd(self, state_dict, strict=True, **kwargs):
+                return _orig_lsd(self, state_dict, strict=False, **kwargs)
+
+            _torch.nn.Module.load_state_dict = _patched_lsd
+            try:
+                model.load_ckpt(ckpt=ckpt)
+            finally:
+                _torch.nn.Module.load_state_dict = _orig_lsd
+                _torch.load = _orig_load
+        else:
+            model.load_ckpt()
         model.eval()
         _CLAP = model
     return _CLAP

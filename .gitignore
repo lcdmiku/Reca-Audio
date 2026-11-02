@@ -29,3 +29,10 @@ Audio-Omni/model/*.ckpt
 .idea/
 .DS_Store
 Thumbs.db
+
+# benchmark data / outputs (downloaded, large)
+runs/Benchmark/_data/
+runs/Benchmark/output/
+runs/Benchmark/UltraEval-Audio/res/
+runs/Benchmark/UltraEval-Audio/raw/
+runs/Benchmark/UltraEval-Audio/envs/
