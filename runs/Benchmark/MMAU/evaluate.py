@@ -37,11 +37,11 @@ from common import audio_io, generation  # noqa: E402
 
 
 def build_prompt(item: dict) -> str:
-    """官方提示词随模型而异；这里要求回复选项原文，以适配 token 匹配判分。"""
+    """官方判分按 token 匹配，答案里带 "(A)"，所以要求模型把选项标签一起复述。"""
     choices = item.get("choices") or []
     lines = [
         "Listen to the audio and answer the question.",
-        "Choose the best option and reply with its exact text (do not reply with a letter).",
+        "Reply with the option exactly as listed, including its letter, e.g. (A) Man.",
         "",
         f"Question: {item.get('question', '')}",
         "Options:",
@@ -69,7 +69,104 @@ def _to_choices(value):
     return []
 
 
+def _write_wav_from_bytes(data: bytes, dst: Path) -> bool:
+    import io
+
+    import soundfile as sf
+
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if data[:4] == b"RIFF":
+            dst.write_bytes(data)
+            return True
+        arr, sr = sf.read(io.BytesIO(data))
+        sf.write(str(dst), arr, int(sr), subtype="PCM_16")
+        return True
+    except Exception as e:  # noqa: BLE001
+        print(f"[prepare] 写音频失败 {dst.name}: {type(e).__name__}: {e}")
+        return False
+
+
+def _prepare_from_parquet(args: argparse.Namespace) -> int:
+    """test_mini.parquet 的字段：context{bytes,path} / instruction / choices / answer / other_attributes。"""
+    import glob
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    files = []
+    for pattern in args.parquet.split(","):
+        files.extend(sorted(glob.glob(pattern.strip())))
+    if not files:
+        raise SystemExit(f"[fatal] 没找到 parquet：{args.parquet}")
+
+    audio_dir = Path(args.audio_dir)
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    want = args.limit * args.stride if args.limit else 10**9
+
+    rows = []
+    cols = ["instruction", "choices", "answer", "other_attributes", "context"]
+    for path in files:
+        if len(rows) >= want:
+            break
+        pf = pq.ParquetFile(path)
+        remaining = want - len(rows)
+        chunks, got = [], 0
+        for rg in range(pf.num_row_groups):
+            chunk = pf.read_row_group(rg, columns=cols)
+            chunks.append(chunk)
+            got += chunk.num_rows
+            if got >= remaining:
+                break
+        table = pa.concat_tables(chunks)
+        take = min(table.num_rows, remaining)
+        print(f"[prepare] {Path(path).name}: {pf.metadata.num_rows} 行 / {pf.num_row_groups} 组，取 {take}")
+        for i in range(take):
+            try:
+                meta = json.loads(table.column("other_attributes")[i].as_py() or "{}")
+            except Exception:  # noqa: BLE001
+                meta = {}
+            item_id = str(meta.get("id") or f"{len(rows):05d}")
+            audio = table.column("context")[i].as_py() or {}
+            data = audio.get("bytes") if isinstance(audio, dict) else None
+            if not data:
+                print(f"[prepare] {item_id} 无音频 bytes，跳过")
+                continue
+            dst = audio_dir / f"{item_id}.wav"
+            if not _write_wav_from_bytes(data, dst):
+                continue
+            rows.append({
+                "id": item_id,
+                "question": table.column("instruction")[i].as_py(),
+                "choices": table.column("choices")[i].as_py(),
+                "answer": table.column("answer")[i].as_py(),
+                "task": meta.get("task", ""),
+                "difficulty": meta.get("difficulty", ""),
+                "sub-category": meta.get("sub-category", ""),
+                "audio": str(dst),
+            })
+
+    if args.stride > 1:
+        rows = rows[:: args.stride]
+        if args.limit:
+            rows = rows[: args.limit]
+
+    out = Path(args.out_jsonl)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    print(f"[prepare] {len(rows)} 条 -> {out}（来源：本地 parquet）")
+    if rows:
+        print(f"[prepare] 示例：task={rows[0]['task']} difficulty={rows[0]['difficulty']} "
+              f"answer={rows[0]['answer']!r}")
+    return 0
+
+
 def cmd_prepare(args: argparse.Namespace) -> int:
+    if args.parquet:
+        return _prepare_from_parquet(args)
+
     from datasets import load_dataset
 
     from common.datasets import _save_audio_value
@@ -254,6 +351,9 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("prepare")
+    p.add_argument("--parquet", default=None,
+                   help="本地 parquet（test_mini.parquet），优先于 --dataset")
+    p.add_argument("--stride", type=int, default=1, help="按步长抽样")
     p.add_argument("--dataset", default="gamma-lab-umd/MMAU-test-mini")
     p.add_argument("--split", default="test")
     p.add_argument("--id-field", default="id")
