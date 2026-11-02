@@ -1,0 +1,240 @@
+whisper-asr:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs: {}
+
+whisper-asr-zh:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: chinese
+
+whisper-asr-en:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: english
+
+whisper-asr-fr:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: french
+
+whisper-asr-yue:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: yue
+
+whisper-sst-zh2en:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: chinese
+        task: translate
+whisper-sst-de2en:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: german
+        task: translate
+whisper-sst-es2en:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: spanish
+        task: translate
+
+whisper-sst-fr2en:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: french
+        task: translate
+whisper-sst-it2en:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: italian
+        task: translate
+
+whisper-asr-ja:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: japanese
+
+whisper-asr-ko:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: korean
+
+whisper-asr-de:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: german
+
+whisper-asr-es:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: spanish
+
+whisper-asr-it:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: italian
+
+whisper-asr-ru:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: russian
+
+whisper-asr-ar:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: arabic
+
+whisper-asr-cs:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: czech
+
+whisper-asr-nl:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: dutch
+
+whisper-asr-fi:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: finnish
+
+whisper-asr-el:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: greek
+
+whisper-asr-hi:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: hindi
+
+whisper-asr-id:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: indonesian
+
+whisper-asr-pl:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: polish
+
+whisper-asr-pt:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: portuguese
+
+whisper-asr-ro:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: romanian
+
+whisper-asr-th:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: thai
+
+whisper-asr-tr:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: turkish
+
+whisper-asr-uk:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: ukrainian
+
+whisper-asr-vi:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      audio: '{{WavPath}}'
+      generate_kwargs:
+        language: vietnamese

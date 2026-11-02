@@ -1,0 +1,9 @@
+fun-asr-nano-2512:
+  class: audio_evals.models.asr.fun_asr_nano.FunASRNano
+  args:
+    path: FunAudioLLM/Fun-ASR-Nano-2512
+    hub: hf
+    model_revision: 272c57b82523ada6fd87095e955f8e29100979ab
+    device: cuda:0
+    env_path: envs/fun_asr_nano
+    requirements_path: audio_evals/lib/FunASRNano/requirements.txt

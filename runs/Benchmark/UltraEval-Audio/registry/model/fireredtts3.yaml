@@ -1,0 +1,32 @@
+# FireRedTTS3 checkpoints share the FireRedTTS3 isolated environment.
+# HF revision: 0ba64bcdff2429d543dba215dccfd582d7e2c3a8
+
+fireredtts3-base:
+  class: audio_evals.models.TTS.fireredtts3.FireRedTTS3
+  args:
+    path: FireRedTeam/FireRedTTS3
+    mode: base
+    device: cuda:0
+    use_wetext: true
+    env_path: envs/FireRedTTS3
+    requirements_path: audio_evals/lib/FireRedTTS3/requirements.txt
+    sample_params:
+      stop_threshold: 0.5
+      n_timesteps: 10
+      inference_cfg: 2.0
+      seed: 1234
+      do_tn: true
+
+fireredtts3-instruct:
+  class: audio_evals.models.TTS.fireredtts3.FireRedTTS3
+  args:
+    path: FireRedTeam/FireRedTTS3
+    mode: instruct
+    device: cuda:0
+    use_wetext: true
+    env_path: envs/FireRedTTS3
+    requirements_path: audio_evals/lib/FireRedTTS3/requirements.txt
+    sample_params:
+      n_timesteps: 10
+      inference_cfg: 1.2
+      seed: 2

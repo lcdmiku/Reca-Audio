@@ -1,0 +1,23 @@
+# VoxCPM2: controllable voice cloning (reference audio provided in prompt, no transcript required)
+voxcpm2:
+  class: audio_evals.models.TTS.voxcpm2.VoxCPM2
+  args:
+    path: openbmb/VoxCPM2
+    denoise: False
+    env_path: envs/VoxCPM2
+    requirements_path: audio_evals/lib/VoxCPM2/requirements.txt
+    sample_params:
+      cfg_value: 2.0
+      inference_timesteps: 10
+
+# VoxCPM2: controllable voice cloning with denoising pre-processing
+voxcpm2-denoise:
+  class: audio_evals.models.TTS.voxcpm2.VoxCPM2
+  args:
+    path: openbmb/VoxCPM2
+    denoise: True
+    env_path: envs/VoxCPM2
+    requirements_path: audio_evals/lib/VoxCPM2/requirements.txt
+    sample_params:
+      cfg_value: 2.0
+      inference_timesteps: 10

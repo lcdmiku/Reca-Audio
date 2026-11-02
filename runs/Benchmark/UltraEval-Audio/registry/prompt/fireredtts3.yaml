@@ -1,0 +1,223 @@
+fireredtts3-voice-clone-english:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "English"
+
+fireredtts3-voice-clone-chinese:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Chinese"
+
+# Generalization of the -english/-chinese prompts to the remaining languages in
+# FireRedTTS3's 24-language tag set (fireredtts3/utils/text_tokenizer.py
+# MULTI_LANG_TAGS), covering the multilingual benchmarks minimax_tts_* and
+# cv3_zero_shot_*. Only `language` differs between prompts; the value is the
+# bare capitalized name the upstream frontend compares against, not the
+# <|Tag|> form. Passing it explicitly avoids upstream fastText auto-detection,
+# which needs a lid.176.ftz download the eval image does not carry.
+
+fireredtts3-voice-clone-arabic:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Arabic"
+
+fireredtts3-voice-clone-cantonese:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Cantonese"
+
+fireredtts3-voice-clone-czech:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Czech"
+
+fireredtts3-voice-clone-dutch:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Dutch"
+
+fireredtts3-voice-clone-finnish:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Finnish"
+
+fireredtts3-voice-clone-french:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "French"
+
+fireredtts3-voice-clone-german:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "German"
+
+fireredtts3-voice-clone-greek:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Greek"
+
+fireredtts3-voice-clone-hindi:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Hindi"
+
+fireredtts3-voice-clone-indonesian:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Indonesian"
+
+fireredtts3-voice-clone-italian:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Italian"
+
+fireredtts3-voice-clone-japanese:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Japanese"
+
+fireredtts3-voice-clone-korean:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Korean"
+
+fireredtts3-voice-clone-polish:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Polish"
+
+fireredtts3-voice-clone-portuguese:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Portuguese"
+
+fireredtts3-voice-clone-romanian:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Romanian"
+
+fireredtts3-voice-clone-russian:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Russian"
+
+fireredtts3-voice-clone-spanish:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Spanish"
+
+fireredtts3-voice-clone-thai:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Thai"
+
+fireredtts3-voice-clone-turkish:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Turkish"
+
+fireredtts3-voice-clone-ukrainian:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Ukrainian"
+
+fireredtts3-voice-clone-vietnamese:
+  class: audio_evals.prompt.base.Prompt
+  args:
+    template:
+      text: "{{text}}"
+      prompt_audio: "{{WavPath}}"
+      prompt_text: "{{prompt_text}}"
+      language: "Vietnamese"

@@ -1,0 +1,285 @@
+![assets/logo.png](assets/logo.png)
+
+<h4 align="center">
+ A Unified Framework for Comprehensive
+Evaluation of Audio Foundation Models
+<p>
+    <p>
+        <a href="README_zh.md">中文</a> | <b>English</b> |
+<a href="https://discord.gg/Qrsbft4e" target="_blank">💬Discord</a> |
+<a href="https://aclanthology.org/2026.acl-demo.56/">UltraEval-Audio Paper</a>
+ </h4>
+
+> 🎉 We are delighted to announce that **UltraEval-Audio has been published at ACL 2026 **! Read the paper on the [ACL Anthology](https://aclanthology.org/2026.acl-demo.56/).
+
+# v1.1 Highlights
+
+> - **Popular model replication**: Added replication support for popular models, including **replication result showcases** and **one-click replication commands** (see `replication/`).
+> - **Isolated Runtime**: Introduced an isolated inference mechanism. Model-specific dependencies are installed/managed automatically; inference runs in the isolated environment and communicates with the main evaluation process via **IPC**, eliminating dependency conflicts.
+> - **Specialized model evaluation support**: Added specialized audio models for **TTS, ASR, and Audio Codec**, further expanding evaluation coverage.
+
+# Overview
+
+### 🚀Exceptional Experience with UltraEval-Audio🚀
+
+UltraEval-Audio — The world's first open-source framework supporting both speech understanding and speech generation evaluation, specifically designed for large audio models. It aggregates 34 authoritative benchmarks, covering four major domains: speech, sound, medicine, and music, supporting 10 languages and 12 task categories. With UltraEval-Audio, you will experience unprecedented convenience and efficiency:
+
+- **Direct Replication of Popular Models 🔬**: Provides detailed [replication documentation and commands](./replication/), ensuring you can easily reproduce evaluation results of open-source models with complete transparency and reproducibility.
+- **One-Click Benchmark Management 📥**: Say goodbye to tedious manual downloading and data processing. UltraEval-Audio automates it all, letting you easily acquire well-known benchmark datasets (e.g., Librispeech, TED-LIUM, Seed-TTS-Eval).
+- **Built-in Evaluation Tools ⚙️**: No need to hunt for evaluation tools. UltraEval-Audio binds datasets with commonly used official evaluation methods (e.g., WER, WER-ZH, BLEU, G-Eval) to ensure alignment between datasets and metrics.
+- **Powerful and Flexible 🛠️**: Supports preview testing, random sampling, error retries, and resume-from-breakpoint, ensuring a flexible and controllable evaluation process while boosting efficiency and accuracy.
+- **Seamless Integration of Custom Datasets 💼**: Supports not only public benchmarks but also powerful custom dataset integration, allowing rapid application in various engineering scenarios.
+- **Easy Integration with Existing Systems 🔗**: With excellent extensibility and standardized design, UltraEval-Audio seamlessly connects with your existing evaluation pipelines, simplifying project management and unifying output results.
+
+![UEA_Architecture](assets/ultraeval_audio_framework.png)
+
+# Changelog🔥
+
+- [2026/09/16]
+  - Support **Seed Audio** API TTS evaluation: `seed-audio-1.0`, `seed-audio-1.0-multilingual`
+  - Covers plain TTS, voice cloning (`prompt_audio`), and instruction-following TTS (`instruction`)
+  - Set `SEED_AUDIO_API_KEY` before running, see [registry/model/seed_audio.yaml](registry/model/seed_audio.yaml)
+- [2026/08/25]
+  - Support **[FireRedTTS3](replication/FireRedTTS3.md)** evaluation (`fireredtts3-base`, `fireredtts3-instruct`), covering Seed-TTS-Eval, MiniMax multilingual TTS (24 languages), and InstructTTSEval
+- [2026/08/12]
+  - Support **[Fun-ASR-Nano-2512](https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512)** evaluation (`fun-asr-nano-2512`) through a pinned isolated FunASR runtime.
+- [2026/07/31]
+  - Support **[MOSS-TTS-v1.5](replication/moss-tts-v1.5.md)** evaluation (`moss-tts-v1.5`), including Seed-TTS-Eval, CV3 zero-shot, and MiniMax multilingual TTS benchmarks (22 languages)
+- [2026/07/27]
+  - Support **[VoxCPM2](replication/VoxCPM2.md)** evaluation (`voxcpm2`, `voxcpm2-denoise`), covering Seed-TTS-Eval, CV3-Eval zero-shot, and MiniMax multilingual TTS benchmarks
+- [2026/07/13]
+  - Support **[InstructTTSEval](replication/InstructTTSEval.md)** for evaluating complex natural-language instruction following in TTS systems.
+  - Includes English and Chinese subsets and evaluates fine-grained acoustic control (APS), descriptive style following (DSD), and role-play/scenario style following (RP) with a Gemini judge.
+  - Provides reference-audio alignment results and one-command evaluation examples for the integrated benchmark.
+- [2026/06/10]
+  - Support **[Qwen3-ASR](replication/qwen3_asr.md)** evaluation (`qwen3-asr-1.7b`, `qwen3-asr-0.6b`), with replication results and commands for English, Chinese, and Chinese dialect ASR benchmarks.
+- [2026/04/20]
+  - Support **[Fish Speech S2 Pro](replication/fishaudio-s2-pro.md)** evaluation, including Seed-TTS-Eval and MiniMax multilingual TTS benchmarks (22 languages)
+- [2026/02/03]
+  - Support **[Qwen3-TTS](replication/qwen3_tts.md)** evaluation
+  - GPU parallel acceleration for faster evaluation/inference
+    - Usage: add `--use_model_pool` and `--workers <N>` to enable multi-GPU parallel inference, e.g.
+      - `python audio_evals/main.py --dataset <dataset_name> --model <model_name> --use_model_pool --workers 4`
+- [2026/01/19]
+  - Support Step-Audio-R1.1 evaluation, with replication report: [Step-Audio-R1.1](replication/step-audio-r1_1.md)
+- [2025/12/31]
+  - release v1.1 🎉🎉🎉
+    - Add replication docs for popular models: [CosyVoice2](replication/CosyVoice2.md), [CosyVoice3](replication/CosyVoice3.md), [GLM-TTS](replication/GLM-TTS.md), [IndexTTS2](replication/IndexTTS2.md), [VoxCPM](replication/VoxCPM.md)
+    - support **Isolated Runtime** offline inference
+    - support TTS、ASR、Audio Codec specific task audio model
+- [2025/12/04]
+  - Support [Qwen3-Omni](replication/qwen3_omni.md), update [Kimi-Audio](replication/kimi-audio.md)
+- [2025/12/02]
+  - 🌟 **Added [Replication Results and Command Documentation](./replication/)**: To better support the open-source community, we have detailed the evaluation process and results of current open-source models, ensuring the evaluation process is completely transparent and reproducible.
+  - Support [Long-TTS-Eval](registry/dataset/long-tts-eval.yaml) dataset, see alignment details in [Long-TTS-Eval](./replication/Long-TTS-Eval.md)
+  - Support [MGM-Omni TTS](registry/model/mgm_omni.yaml) model, see alignment details in [MGM-Omni](./replication/MGM-Omni.md)
+- [2025/10/30]
+  - Support [VoxCPM](https://huggingface.co/openbmb/VoxCPM-0.5B) TTS model: `--model voxcpm-tts` `--model voxcpm-vc`
+  - Use `uv` to accelerate model dependency installation 🚀
+- [2025/10/17]
+  - [Support seed-tts-eval dataset](docs/seed-tts-eval4voice_clone.md)
+- [2025/05/22]
+  - [Use audio quality metrics](https://github.com/OpenBMB/UltraEval-Audio/blob/main/docs/how%20use%20UTMOS%2C%20DNSMOS%20eval%20speech%20quality.md)
+- [2025/05/12]
+  - Support Qwen2.5-Omni `qwen2.5-omni-audio, qwen2.5-omni-speech`, Kimi-Audio-7B-Instruct `kimiaudio, kimiaudio-speech` models, and update Audio Understanding Leaderboard
+- [2025/05/8]
+  - Faster resume evaluation, `-r/--resume` parameter, automatically searches for the latest breakpoint result if no file is specified
+  - Support evaluation starting from inference file, `--infer-file` parameter, allows direct evaluation from inference file without regeneration
+- [2025/03/23]
+  - Added support for step-audio model evaluation and ranking
+    - Ranking details: [leaderboard.md](assets/leaderboard.md)
+    - Evaluation support: [Step-Audio-Chat](https://github.com/UltraEval/Step-Audio)
+- [2025/03/04]
+  - Support [resume evaluation](docs/Procedures for Restarting an Incomplete Evaluation.md), command line parameter `--resume $checkpoint_res_file`
+  - glm-4-voice service deployment, supports UltraEval-Audio evaluation, see details at [GLM-4-Voice](https://github.com/UltraEval/GLM-4-Voice)
+  - Parallel evaluation support, command line parameter `--workers $num_workers`
+- [2025/01/13] release v1.0
+
+# Leaderboard
+
+## Audio Understanding Leaderboard
+
+> **Audio Understanding Audio Foundation Models**: Speech + Text → Text
+>
+> WER/CER ($\downarrow$) for ASR, BLEU ($\uparrow$) for AST, and ACC ($\uparrow$) for EMO. Best results are in bold.
+>
+> **Scoring**:
+>
+> - **Avg. Score ($\uparrow$)**: mean of all available normalized metric scores. For WER/CER-based metrics we use \((100-\text{WER/CER})\); for other metrics (e.g., BLEU/Acc.) we keep the original value.
+
+| Model                                 | ASR <br>Librispeech <br>dev-clean\|dev-other <br>test-clean\|test-other | ASR <br>TED-LIUM | ASR <br>CV-15 <br>en\|zh | ASR <br>Aishell-1 | ASR <br>FLEURS | ASR <br>Wenet <br>-test-net | AST <br>covost2-en2zh | AST <br>covost2-zh2en | EMO <br>MELD | Avg. Score <br>($\uparrow$) |
+| :------------------------------------ | :---------------------------------------------------------------------------------: | :------------------: | :------------------------------: | :-------------------: | :----------------: | :---------------------------------: | :-----------------------: | :-----------------------: | :--------------: | :-------------------------------: |
+| **GPT-4o-Realtime**             |                            2.30\|5.60 <br>2.60\|5.50                            |         4.80         |           27.44\|37.44           |         7.30         |        5.40        |                28.90                |           37.10           |           15.70           |      33.20      |               73.75               |
+| **Qwen3-Omni-30B-A3B-Instruct** |                            1.25\|2.27 <br>1.36\|2.57                            |         2.82         |  **6.00**\|**4.32**  |         0.87         |        2.61        |           **4.82**           |           46.58           |      **29.40**      |      56.81      |          **84.92**          |
+| **Qwen2.5-Omni**                |                            2.10\|4.20 <br>2.40\|4.20                            |         4.70         |            8.70\|5.20            |         1.10         |        4.60        |                6.00                |           42.50           |           11.50           |      53.60      |               81.88               |
+| **MiniCPM-o 2.6**               |                            1.60\|3.40 <br>1.70\|4.40                            |         3.00         |           10.30\|9.60           |         1.60         |        4.40        |                6.90                |      **48.20**      |           27.20           |      52.40      |               83.15               |
+| **Kimi-Audio-7B-Instruct**      |                  **1.18\|2.34** <br>**1.28\|2.44**                  |         2.96         |            7.09\|5.72            |    **0.60**    |   **2.53**   |                5.55                |           36.61           |           18.30           | **59.23** |               83.27               |
+| **Gemini-1.5-Flash**            |                           5.90\|7.20 <br>21.90\|16.30                           |         6.90         |          208.00\|84.37          |         9.00         |       85.90       |               279.90               |           33.40           |           8.20           |      45.20      |               27.80               |
+| **Gemini-1.5-Pro**              |                            2.60\|4.40 <br>2.90\|4.90                            |         3.00         |           8.36\|13.26           |         4.50         |        5.90        |                14.30                |           47.30           |           22.60           |      48.40      |               81.09               |
+| **Gemini-2.5-Flash**            |                           3.73\|6.71 <br>3.28\|12.03                           |         3.53         |           46.76\|36.15           |         6.40         |        6.45        |               126.07               |           3.67           |           10.61           |      51.53      |               62.67               |
+| **Gemini-2.5-Pro**              |                            5.30\|4.51 <br>2.84\|6.74                            |    **2.52**    |           9.42\|11.04           |         3.36         |        4.25        |                16.83                |           41.75           |           27.84           |      46.59      |               80.72               |
+| **Qwen2-Audio-7B**              |                            1.57\|3.50 <br>1.60\|3.88                            |         3.43         |            8.67\|7.03            |         1.52         |        5.89        |                8.09                |           45.30           |           24.84           |      42.87      |               82.14               |
+| **Qwen2-Audio-7B-Instruct**     |                            2.90\|5.50 <br>3.10\|5.70                            |         5.90         |           10.68\|8.39           |         2.60         |        6.90        |                10.30                |           39.50           |           22.90           |      17.40      |               78.29               |
+| **MiDaShengLM-7B**              |                            2.20\|4.75 <br>2.21\|5.16                            |        146.53        |           13.66\|29.13           |         1.23         |        3.28        |                16.56                |           38.52           |           22.68           |      53.96      |               68.50               |
+
+## Audio Generation Leaderboard
+
+> **Audio Generation Audio Foundation Models**: Speech → Speech
+> Table: Audio generation performance ($\uparrow$). Acoustic metrics (UTMOS | DNSMOS P.835 | DNSMOS P.808, scores range from 0 to 5) are evaluated on the generated audio responses from the speech tasks. Best results are in bold.
+>
+> Note: The average score is computed as the average of 6 scores: five speech-task scores and normalized acoustic scores. For acoustic scores (UTMOS | DNSMOS P.835 | DNSMOS P.808), each value (0--5) is multiplied by 20 to map to 0--100, then averaged to obtain the normalized acoustic score.
+
+| Models                                | Speech<br>WebQuestions | Speech<br>TriviaQA | Speech<br>AlpacaEval | Speech<br>CMMLU | Speech<br>HSK |              Acoustics              | Avg. Score<br>($\uparrow$) |
+| :------------------------------------ | :------------------------: | :--------------------: | :----------------------: | :-----------------: | :---------------: | :----------------------------------: | :------------------------------: |
+| **GPT-4o-Realtime**             |      **51.60**      |    **69.70**    |     **74.00**     |        70.05        |  **98.69**  |           4.29\|3.44\|4.26           |         **74.00**         |
+| **Qwen3-Omni-30B-A3B-Instruct** |           51.50           |         55.27         |          67.97          |        47.83        |       40.27       |      **4.44**\|3.45\|4.12      |              57.15              |
+| **Qwen2.5-Omni**                |           38.89           |         39.94         |          54.00          |   **73.72**   |       95.65       | 4.23\|**3.48**\|**4.27** |              63.68              |
+| **MiniCPM-o 2.6**               |           40.00           |         40.20         |          51.00          |        49.22        |       80.68       |           4.12\|3.39\|4.02           |              56.69              |
+| **Kimi-Audio-7B-Instruct**      |           33.69           |         38.20         |          34.40          |        66.98        |       97.42       |           2.94\|3.22\|3.62           |              56.69              |
+| **GLM-4-Voice**                 |           32.00           |         36.40         |          51.00          |        52.61        |       71.06       |           4.21\|3.46\|4.07           |              53.56              |
+
+## Audio Codec Leaderboard
+
+> **Audio Codec**: Speech → Speech.
+> Table: Audio Codec Performance: ASR-WER ($\downarrow$), ASR-CER ($\downarrow$), SIM ($\uparrow$), and Acoustics (UTMOS\|DNSMOS P.835\|DNSMOS P.808, $\uparrow$). Note: The hyphen (-) indicates that UTMOS is not applicable to Chinese speech (AISHELL-1). Best results are in bold.
+>
+> Note: For acoustic scores we use UTMOS, DNSMOS P.835, and DNSMOS P.808 metrics. To calculate the average score, for ASR-WER and ASR-CER, we calculate \(100-\text{val}\). For acoustic scores, each available value (ranges from 0 to 5) is normalized by \(20\times\mathrm{val}\) (mapping to 0--100), and the acoustic score is their average (the hyphen `-' is ignored). The final score is the average of 9 metric scores.
+
+| Models                          | Librispeech-dev-clean<br>ASR-WER | Librispeech-dev-clean<br>SIM | Librispeech-dev-clean<br>Acoustics | Librispeech-test-clean<br>ASR-WER | Librispeech-test-clean<br>SIM | Librispeech-test-clean<br>Acoustics | AISHELL-1<br>ASR-CER | AISHELL-1<br>SIM |    AISHELL-1<br>Acoustics    | Avg. Score<br>($\uparrow$) |
+| :------------------------------ | :----------------------------------: | :------------------------------: | :------------------------------------: | :-----------------------------------: | :-------------------------------: | :-------------------------------------: | :----------------------: | :------------------: | :-------------------------------: | :------------------------------: |
+| **Encodec-24k**           |                 4.56                 |              59.40              |            1.58\|3.12\|2.36            |                 4.32                 |               59.40               |            1.57\|3.12\|2.36            |          13.95          |        47.48        |           -\|2.93\|2.03           |              65.24              |
+| **Encodec-48k**           |                 3.85                 |              65.53              |            1.52\|2.88\|2.42            |                 3.80                 |               66.00               |            1.48\|2.87\|2.40            |           6.85           |        68.78        |           -\|2.79\|2.21           |              69.59              |
+| **ChatTTS-DVAE**          |                 7.49                 |              34.83              |            1.30\|2.66\|2.11            |                 6.75                 |               36.21               |            1.29\|2.64\|2.12            |          32.36          |        32.36        |           -\|2.24\|1.57           |              52.86              |
+| **Mimi (32bit)**          |            **2.04**            |         **92.18**         |            3.83\|2.87\|2.44            |            **1.96**            |          **92.68**          |            3.84\|2.92\|2.49            |      **2.82**      |   **84.80**   |           -\|2.43\|1.89           |              80.96              |
+| **Mimi (8bit)**           |                 2.76                 |              72.15              |            3.52\|2.78\|2.37            |                 2.83                 |               73.13               |            3.53\|2.83\|2.43            |           6.82           |        60.63        |           -\|2.42\|2.04           |              72.72              |
+| **Mimi-streaming (8bit)** |                 6.76                 |              54.02              |            1.65\|2.78\|2.37            |                 6.19                 |               54.32               |            1.63\|2.83\|2.43            |          19.62          |        40.67        |           -\|2.42\|2.04           |              61.37              |
+| **WavTokenizer-large-75** |                 4.31                 |              69.97              |       4.01\|3.64\|**3.26**       |                 4.05                 |               68.15               |       4.00\|3.63\|**3.27**       |           8.97           |        64.27        |      -\|3.11\|**2.85**      |              76.67              |
+| **WavTokenizer-large-40** |                 8.13                 |              60.26              |            3.78\|3.70\|3.13            |                 7.73                 |               56.63               |            3.77\|3.70\|3.16            |          25.52          |        49.21        |           -\|3.13\|2.50           |              69.18              |
+| **Spark**                 |                 2.39                 |              79.94              |  **4.18**\|**3.85**\|3.24  |                 2.53                 |               79.53               |  **4.18**\|**3.83**\|3.24  |           3.66           |        74.76        | -\|**3.63**\|**2.85** |         **82.29**         |
+
+# Quick Start
+
+## Environment Preparation
+
+```shell
+git clone https://github.com/OpenBMB/UltraEval-Audio.git
+cd UltraEval-Audio
+conda create -n env python=3.10 -y
+conda activate env
+pip install -e .
+```
+
+or use `uv` for faster installation:
+
+```shell
+uv venv env --python 3.10
+source env/bin/activate
+uv pip install -e .
+```
+
+## Run Examples
+
+```bash
+# For some regions, you may need to set: export HF_ENDPOINT=https://hf-mirror.com
+# Test MiniCPM-o 2.6 speech understanding capability
+CUDA_VISIBLE_DEVICES=0 python audio_evals/main.py --dataset sample --prompt mini-cpm-omni-asr-zh --model MiniCPMo2_6-audio
+
+# Test MiniCPM-o 2.6 speech generation capability
+CUDA_VISIBLE_DEVICES=0 python audio_evals/main.py --dataset llama-questions-s2t --model MiniCPMo2_6-speech
+
+# Test GPT-4o-Realtime speech understanding capability
+export OPENAI_API_KEY=$your-key
+python audio_evals/main.py --dataset sample --model gpt4o_audio
+
+# Test GPT-4o-Realtime speech generation capability
+export OPENAI_API_KEY=$your-key
+python audio_evals/main.py --dataset llama-questions-s2t --model gpt4o_speech
+
+# Test gemini-1.5-pro speech understanding capability
+export GOOGLE_API_KEY=$your-key
+python audio_evals/main.py --dataset sample --model gemini-pro
+
+# Test Qwen3-ASR speech recognition capability
+CUDA_VISIBLE_DEVICES=0 python audio_evals/main.py --dataset librispeech-test-clean --model qwen3-asr-1.7b --prompt simple-asr
+# See full replication results and commands: replication/qwen3_asr.md
+
+# Test Fun-ASR-Nano multilingual speech recognition capability
+CUDA_VISIBLE_DEVICES=0 python audio_evals/main.py --dataset librispeech-test-clean --model fun-asr-nano-2512 --prompt simple-asr
+
+# Test qwen2-audio-offline speech understanding capability
+CUDA_VISIBLE_DEVICES=0 python audio_evals/main.py --dataset sample --model qwen2-audio-chat
+
+# Test Seed Audio voice cloning capability
+export SEED_AUDIO_API_KEY=$your-key
+python audio_evals/main.py --dataset seed_tts_eval_zh --model seed-audio-1.0 --prompt voice-clone
+```
+
+If you encounter errors or cannot reproduce Mini-CPM-o 2.6 results, please check [FAQ](FAQ.md).
+
+## Res
+
+Evaluation complete, results are as follows:
+
+```txt
+- res
+    |-- $model-name
+        |-- $dataset
+            |-- $time.jsonl
+            |-- $time-overview.jsonl
+```
+
+## Usage
+
+Evaluation command:
+
+```bash
+python audio_evals/main.py --dataset <dataset_name> --model <model_name>
+```
+
+## Dataset Selection
+
+`<dataset_name>` specifies the dataset to evaluate. Supported datasets can be viewed via `python cli/list_availabel.py`
+
+Construct your own dataset: [docs/how add a dataset.md](docs%2Fhow%20add%20a%20dataset.md)
+
+### Model Selection
+
+`model_name` specifies the model to evaluate. Supported models can be viewed via `python cli/list_availabel.py`
+
+Evaluate your own model [docs/how eval your model.md](docs%2Fhow%20eval%20your%20model.md)
+
+# Contact Us
+
+If you have any suggestions or questions, please file an issue or join our Discord group: `https://discord.com/invite/Qrsbft4e`
+
+# Citation
+
+If you find UltraEval-Audio helpful, please consider citing our paper 📝 and staring us ⭐️！
+
+```bibtex
+@inproceedings{shi-etal-2026-ultraeval,
+    title = "{U}ltra{E}val-Audio: A Unified Framework for Comprehensive Evaluation of Audio Foundation Models",
+    author = "Shi, Qundong  and
+      Zhou, Jie  and
+      Lin, Biyuan  and
+      Cui, Junbo  and
+      Zeng, Guoyang  and
+      Zhou, Yixuan  and
+      Wang, Ziyang  and
+      Liu, Xin  and
+      Luo, Zhen  and
+      Wang, Yudong  and
+      Liu, Zhiyuan",
+    editor = "Durrett, Greg  and
+      Jian, Ping",
+    booktitle = "Proceedings of the 64th Annual Meeting of the {A}ssociation for {C}omputational {L}inguistics (Volume 3: System Demonstrations)",
+    month = jul,
+    year = "2026",
+    address = "San Diego, California, United States",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.acl-demo.56/",
+    doi = "10.18653/v1/2026.acl-demo.56",
+    pages = "566--577",
+    ISBN = "979-8-89176-392-0",
+}
+```
