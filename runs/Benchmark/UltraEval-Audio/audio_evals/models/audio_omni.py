@@ -1,19 +1,24 @@
 """UltraEval-Audio adapter for Audio-Omni.
 
-Registers `--model audio-omni`, wrapping `audio_omni.api.AudioOmni`:
-- prompt 里的 audio 取第一个，交给 understand(question, audio=...)
-- 文本部分拼成问题
+Registers `--model audio-omni`, wrapping `audio_omni.api.AudioOmni`.
 
-对应 registry/model/audio_omni.yaml。
+UltraEval 的 PromptStruct 有几种形态（见 audio_evals/base.py）：
+- 纯字符串
+- {"audio": path, "text": ...}（simple-asr 这类简化模板）
+- [{"role": "user", "contents": [{"type": "audio"|"text", "value": ...}]}]
+
+这里统一抽成 (question, audio_path)。
 """
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Optional, Tuple
 
 from audio_evals.base import PromptStruct
 from audio_evals.models.model import Model
+
+DEFAULT_QUESTION = "Transcribe the audio content into text."
 
 
 class AudioOmniModel(Model):
@@ -49,14 +54,48 @@ class AudioOmniModel(Model):
             dtype=dtype,
         )
 
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _resolve_audio(path: str) -> str:
+        """数据集里的音频常是相对路径（raw/...），相对 cwd 解析一次。"""
+        p = Path(path)
+        if p.is_absolute() or p.exists():
+            return str(p)
+        alt = Path.cwd() / p
+        return str(alt) if alt.exists() else str(p)
+
+    def _parse(self, prompt: PromptStruct) -> Tuple[str, Optional[str]]:
+        texts: List[str] = []
+        audios: List[str] = []
+
+        def walk(node) -> None:
+            if isinstance(node, str):
+                texts.append(node)
+            elif isinstance(node, dict):
+                # 标准对话结构：{"type": "audio"|"text", "value": ...}
+                node_type = node.get("type")
+                if node_type == "audio" and isinstance(node.get("value"), str):
+                    audios.append(self._resolve_audio(node["value"]))
+                    return
+                if node_type == "text" and isinstance(node.get("value"), str):
+                    texts.append(node["value"])
+                    return
+                for key, value in node.items():
+                    if key in ("audio", "audio_path", "wav", "WavPath"):
+                        if isinstance(value, str):
+                            audios.append(self._resolve_audio(value))
+                    elif key in ("text", "content", "question", "instruction"):
+                        walk(value)
+                    elif key in ("contents", "value"):
+                        walk(value)
+            elif isinstance(node, (list, tuple)):
+                for item in node:
+                    walk(item)
+
+        walk(prompt)
+        question = "\n".join(t for t in texts if t and not t.startswith("raw/")).strip()
+        return question or DEFAULT_QUESTION, (audios[0] if audios else None)
+
     def _inference(self, prompt: PromptStruct, **kwargs) -> str:
-        texts, audios = [], []
-        for line in prompt:
-            for item in line.get("contents", []):
-                if item.get("type") == "audio":
-                    audios.append(item["value"])
-                elif item.get("type") == "text":
-                    texts.append(item["value"])
-        question = "\n".join(texts).strip()
-        audio = audios[0] if audios else None
+        question, audio = self._parse(prompt)
         return self.model.understand(question, audio=audio)
