@@ -100,9 +100,20 @@ def _prepare_from_parquet(args: argparse.Namespace) -> int:
         pf = pq.ParquetFile(path)
         cols = [args.id_field, args.question_field, "choice_a", "choice_b", "choice_c",
                 "choice_d", args.answer_field, "category", "sub-category", args.audio_field]
-        table = pf.read_row_group(0, columns=cols)
-        take = min(table.num_rows, want - len(rows))
-        print(f"[prepare] {Path(path).name}: {table.num_rows} 行，取 {take}")
+        # 一个 shard 可能有多个 row group（实测每组 100 行），逐个读直到凑够
+        import pyarrow as pa
+
+        remaining = want - len(rows)
+        chunks, got = [], 0
+        for rg in range(pf.num_row_groups):
+            chunk = pf.read_row_group(rg, columns=cols)
+            chunks.append(chunk)
+            got += chunk.num_rows
+            if got >= remaining:
+                break
+        table = pa.concat_tables(chunks)
+        take = min(table.num_rows, remaining)
+        print(f"[prepare] {Path(path).name}: {pf.metadata.num_rows} 行 / {pf.num_row_groups} 组，取 {take}")
         for i in range(take):
             rec = {c: table.column(c)[i].as_py() for c in cols}
             item_id = str(rec.get(args.id_field) or f"{len(rows):05d}")
