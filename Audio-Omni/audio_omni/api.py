@@ -293,7 +293,15 @@ class AudioOmni:
         inputs = inputs.to(omni_model.device).to(omni_model.dtype)
 
         text_ids = omni_model.generate(**inputs, return_audio=False, use_audio_in_video=True)
-        return processor.batch_decode(text_ids, skip_special_tokens=True)[0]
+        # 某些 transformers 版本会把输入也带回来，直接 decode 会得到「整段 prompt + 回答」，
+        # 官方判分只看首字符，必须先切掉输入部分。
+        input_len = inputs["input_ids"].shape[1]
+        if text_ids.shape[1] > input_len:
+            text_ids = text_ids[:, input_len:]
+        out = processor.batch_decode(text_ids, skip_special_tokens=True)[0]
+        if "assistant" in out:
+            out = out.split("assistant")[-1]
+        return out.strip()
 
     # ------------------------------------------------------------------
     # Internal helpers
