@@ -212,12 +212,13 @@ def panns_scores(gen_files: Sequence[str], ref_files: Sequence[str], device: str
         print(f"[metrics] PANNs 不可用，跳过 KL/IS/FD：{e}")
         return {}
 
-    def softmax(x: np.ndarray) -> np.ndarray:
-        x = x - x.max(axis=1, keepdims=True)
-        e = np.exp(x)
-        return e / e.sum(axis=1, keepdims=True)
+    def normalize(x: np.ndarray) -> np.ndarray:
+        # PANNs 是 527 类多标签 sigmoid 概率，不是互斥类别。
+        # 不能做 softmax（会把尖峰分布压平，KL→0、IS→1），只做 L1 归一化。
+        x = np.clip(x, 1e-10, None)
+        return x / x.sum(axis=1, keepdims=True)
 
-    p_gen, p_ref = softmax(gen_logits), softmax(ref_logits)
+    p_gen, p_ref = normalize(gen_logits), normalize(ref_logits)
     p_ref_mean = p_ref.mean(axis=0, keepdims=True)
     eps = 1e-10
     kl_gen_ref = float(np.mean(np.sum(p_gen * np.log((p_gen + eps) / (p_ref_mean + eps)), axis=1)))

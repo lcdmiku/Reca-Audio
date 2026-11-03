@@ -94,12 +94,26 @@
 
 | 数据集 | n（生成/参考） | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP score ↑ |
 |---|---|---|---|---|---|---|
-| **AudioCaps** | 1000 / 4411 | **0.2230** | 0.001054 | 1.0010 | 43.83 | 0.4575 |
-| **MusicCaps** | 1004 / 1004 | **0.3140** | 0.000805 | 1.0008 | 18.55 | 0.3909 |
+| **AudioCaps** | 1000 / 4411 | **0.2230** | 2.196 | 7.706 | 43.83 | 0.4575 |
+| **MusicCaps** | 1004 / 1004 | **0.3140** | 1.325 | 3.386 | 18.55 | 0.3909 |
+
+参照值（同一 CLAP 后端）：**真实 AudioCaps 音频 vs 其 caption = 0.5306**（300 条）。
+生成 0.4575 比真实数据低 0.073（相对 ~14%），属于“可用但未饱和”，不是塌缩。
+
+> 早期版本报过 KL≈0.001、IS≈1.00 —— 那是**指标实现 bug**：PANNs 输出是 527 类多标签
+> sigmoid，代码错误地做了 softmax，把尖峰后验压平。改成 L1 归一化后即为上表数值。
+
+### 3.3 指标实现说明（KL / IS / FD）
+
+- PANNs：`panns_inference` 的 CNN14，clipwise 后验 + 2048 维 embedding；
+- KL / IS：对后验做 **L1 归一化**（不是 softmax），KL 用 `p_gen` 与参考集均值分布；
+- FD：PANNs embedding 上的 Fréchet 距离；
+- CLAP-FAD：`laion_clap` 630k-audioset 的 512 维音频嵌入；
+- 所有嵌入均**分批**计算（一次 32 条），否则 1000+ 条会 OOM。
 
 生成耗时：AudioCaps 1000 条约 95 分钟；MusicCaps 1004 条约 100 分钟（4 分片并行）。
 
-### 3.3 VGGish-FAD 状态：未跑通
+### 3.4 VGGish-FAD 状态：未跑通
 
 `fadtk` 的 VGGish 通过 `torch.hub.load('harritaylor/torchvggish', 'vggish')` 取权重，
 服务器无法访问 GitHub（`RemoteDisconnected`），因此 **VGGish-FAD 缺失**。
@@ -110,7 +124,7 @@
    放到 `~/.cache/torch/hub/checkpoints/`；
 2. `harritaylor/torchvggish` 源码放到 `~/.cache/torch/hub/harritaylor_torchvggish_main/`。
 
-### 3.4 可比性（重要）
+### 3.5 可比性（重要）
 
 | 项 | 论文 | 本次 |
 |---|---|---|
@@ -121,7 +135,7 @@
 结论：这两行数字是**同一协议下的基线**，用于后续 RecA 后训练模型的前后对比；
 与论文 1.86/1.94 之间隔着数据集、嵌入、参考集三重差异，不能直接比大小。
 
-### 3.5 复现
+### 3.6 复现
 
 ```bash
 cd ~/Reca-Audio
@@ -161,8 +175,8 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 |---|---|---|---|---|
 | MMSU | ✅ 全量 5000 | **59.70 %** | 56.83 | 数据可比，提示词不同 |
 | MMAU | ✅ test-mini 1000 | **57.70 %** | 63.30 | 子集 + 提示词不同 |
-| AudioCaps | ✅ 1000 条（T2A） | **CLAP-FAD 0.2230 / KL 0.00105 / IS 1.0010 / FD 43.83 / CLAP 0.4575** | FAD 1.86 | 数据子集 + 嵌入不同，不可比 |
-| MusicCaps | ✅ 1004 条（T2M） | **CLAP-FAD 0.3140 / KL 0.000805 / IS 1.0008 / FD 18.55 / CLAP 0.3909** | FAD 1.94 | 同上 |
+| AudioCaps | ✅ 1000 条（T2A） | **CLAP-FAD 0.2230 / KL 2.196 / IS 7.706 / FD 43.83 / CLAP 0.4575** | FAD 1.86 | 数据子集 + 嵌入不同，不可比 |
+| MusicCaps | ✅ 1004 条（T2M） | **CLAP-FAD 0.3140 / KL 1.325 / IS 3.386 / FD 18.55 / CLAP 0.3909** | FAD 1.94 | 同上 |
 | AudioEdit | ⛔ 缺数据 | — | AE_FAD 3.27 | — |
 | TTS | ⛔ 缺数据 | — | WER 1.77 | — |
 
@@ -256,7 +270,7 @@ python audio_evals/main.py --dataset librispeech-test-clean --model audio-omni
 
 ## 8. 下一步
 
-1. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.3；服务器访问不到 GitHub）；
+1. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）；
 2. 给 AudioEdit / TTS 准备 items.jsonl；
 3. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
 4. 在 UltraEval 上补 test-other / dev-clean，形成完整 ASR 基线；
