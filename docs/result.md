@@ -79,32 +79,49 @@
 值得记录的中间现象：同一批 100 条，**宽松提示词（允许解释）只有 24%，改成“只输出标签+原文”后升到 72%**——
 说明这套 token 匹配判分对输出格式极其敏感，任何对比都必须注明提示词。
 
-## 3. 生成类：AudioCaps T2A（基线）
+## 3. 生成类：AudioCaps / MusicCaps（T2A / T2M 全量）
 
-- **数据**：HF 镜像 `TwinkStart/AudioCaps`（Gitee `hf-datasets/OpenSound-AudioCaps` 的 LFS 源），
-  取前 3 个分片中的 **102 条**真实 AudioCaps 片段（caption + 10 s 48 kHz 音频）。
-- **设置**：100 步 ODE、CFG=6.0（论文设置），DiT fp16，理解塔在 cuda:1。
-- **指标**：FAD 建在 **CLAP 嵌入**上（默认后端），另报 CLAP 文本-音频相似度。
+### 3.1 设置
 
-| 指标 | 值 | n |
-|---|---|---|
-| **CLAP-FAD ↓** | **0.4535** | 102 生成 / 103 参考 |
-| **CLAP score ↑** | **0.4766** | 102 |
+- 采样：**100 步 ODE、CFG=6.0**（论文设置），DiT fp16，理解塔在 cuda:1；
+- 并行：4 分片 × 2 卡（`GPUS_PER_PROC=2`），单条 ~21 s；
+- 指标后端：**CLAP**（`laion_clap` 630k-audioset）+ **PANNs**（CNN14，KL/IS/FD）；
+- 数据：
+  - AudioCaps：Gitee `hf-datasets/OpenSound-AudioCaps`（LFS，41 个分片 41 GB）；
+  - MusicCaps：HF `mahendra0203/musiccaps_processed`（audio + caption）。
 
-生成耗时：102 条 × 100 步，4 分片 × 2 卡并行，约 **9 分钟**（单条 ~21 s）。
+### 3.2 结果
 
-### 可比性（重要）
+| 数据集 | n（生成/参考） | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP score ↑ |
+|---|---|---|---|---|---|---|
+| **AudioCaps** | 1000 / 4411 | **0.2230** | 0.001054 | 1.0010 | 43.83 | 0.4575 |
+| **MusicCaps** | 1004 / 1004 | **0.3140** | 0.000805 | 1.0008 | 18.55 | 0.3909 |
+
+生成耗时：AudioCaps 1000 条约 95 分钟；MusicCaps 1004 条约 100 分钟（4 分片并行）。
+
+### 3.3 VGGish-FAD 状态：未跑通
+
+`fadtk` 的 VGGish 通过 `torch.hub.load('harritaylor/torchvggish', 'vggish')` 取权重，
+服务器无法访问 GitHub（`RemoteDisconnected`），因此 **VGGish-FAD 缺失**。
+
+补齐只需两步（拿到文件后即可启用 `--vggish`）：
+
+1. `vggish-10086976.pth`、`vggish_pca_params-970ea276.pth`
+   放到 `~/.cache/torch/hub/checkpoints/`；
+2. `harritaylor/torchvggish` 源码放到 `~/.cache/torch/hub/harritaylor_torchvggish_main/`。
+
+### 3.4 可比性（重要）
 
 | 项 | 论文 | 本次 |
 |---|---|---|
-| 数据 | AudioCaps 官方 test（975 条） | 102 条子集（HF 分片取样） |
-| FAD 嵌入 | PANNs / VGGish | **CLAP** |
-| 结果 | T2A_FAD = 1.86 | 0.4535（**不可与 1.86 比较**） |
+| AudioCaps 数据 | 官方 test 975 条 | **1000 条**（镜像 4411 条里取前 1000） |
+| MusicCaps 数据 | 官方 test | 1004 条（镜像全量） |
+| FAD 嵌入 | VGGish（T2A_FAD 1.86） | CLAP + PANNs，**数值不可比** |
 
-这个 0.4535 只能作为**同一协议下的相对基线**，用于后续 RecA 后训练模型的前后对比；
-要跟论文对齐，需要官方 975 条 test 音频 + PANNs/VGGish 后端（均未就绪）。
+结论：这两行数字是**同一协议下的基线**，用于后续 RecA 后训练模型的前后对比；
+与论文 1.86/1.94 之间隔着数据集、嵌入、参考集三重差异，不能直接比大小。
 
-### 复现
+### 3.5 复现
 
 ```bash
 cd ~/Reca-Audio
@@ -112,11 +129,25 @@ source ~/miniconda3/etc/profile.d/conda.sh && conda activate audio-omni
 export QWEN_OMNI_MODEL_PATH=$(ls -d ~/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots/*/ | head -1)
 export CLAP_CKPT=~/.cache/laion_clap/630k-audioset-best.pt
 
+# AudioCaps
 python runs/Benchmark/AudioCaps/build_subset.py \
-  --shards-dir runs/Benchmark/_data/OpenSound-AudioCaps/data \
-  --pattern "test-*.parquet" --max-items 100
-REF=$PWD/runs/Benchmark/_data/audiocaps/ref GPUS_PER_PROC=2 \
-  bash runs/Benchmark/run_shards.sh --benchmark AudioCaps
+  --shards-dir runs/Benchmark/_data/OpenSound-AudioCaps/data --pattern "test-*.parquet" \
+  --ids-csv runs/Benchmark/_data/audiocaps/test.csv \
+  --ref-dir runs/Benchmark/_data/audiocaps/full2/ref \
+  --out-jsonl runs/Benchmark/_data/audiocaps/full2/prompts.jsonl
+INPUT=.../prompts1000.jsonl REF=.../full2/ref OUT=.../AudioCaps_full \
+  GPUS_PER_PROC=2 bash runs/Benchmark/run_shards.sh --benchmark AudioCaps
+python runs/Benchmark/AudioCaps/evaluate.py score --out .../AudioCaps_full --ref .../full2/ref --panns
+
+# MusicCaps
+python runs/Benchmark/AudioCaps/build_subset.py \
+  --shards-dir runs/Benchmark/_data/musiccaps --pattern "train-*.parquet" \
+  --id-cols youtube_id,start_time --max-items 1000 \
+  --ref-dir runs/Benchmark/_data/musiccaps/ref \
+  --out-jsonl runs/Benchmark/_data/musiccaps/prompts1000.jsonl
+INPUT=.../prompts1000.jsonl REF=.../musiccaps/ref OUT=.../MusicCaps_full \
+  GPUS_PER_PROC=2 bash runs/Benchmark/run_shards.sh --benchmark MusicCaps
+python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref .../musiccaps/ref --panns
 ```
 
 ## 4. 编辑类（AudioEdit）与 TTS（Seed-TTS en）
@@ -130,8 +161,8 @@ REF=$PWD/runs/Benchmark/_data/audiocaps/ref GPUS_PER_PROC=2 \
 |---|---|---|---|---|
 | MMSU | ✅ 全量 5000 | **59.70 %** | 56.83 | 数据可比，提示词不同 |
 | MMAU | ✅ test-mini 1000 | **57.70 %** | 63.30 | 子集 + 提示词不同 |
-| AudioCaps | ✅ 102 条子集 | **CLAP-FAD 0.4535 / CLAP 0.4766** | FAD 1.86 | 子集 + CLAP-FAD，不可比 |
-| MusicCaps | ⛔ 缺数据/指标后端 | — | FAD 1.94 | — |
+| AudioCaps | ✅ 1000 条（T2A） | **CLAP-FAD 0.2230 / KL 0.00105 / IS 1.0010 / FD 43.83 / CLAP 0.4575** | FAD 1.86 | 数据子集 + 嵌入不同，不可比 |
+| MusicCaps | ✅ 1004 条（T2M） | **CLAP-FAD 0.3140 / KL 0.000805 / IS 1.0008 / FD 18.55 / CLAP 0.3909** | FAD 1.94 | 同上 |
 | AudioEdit | ⛔ 缺数据 | — | AE_FAD 3.27 | — |
 | TTS | ⛔ 缺数据 | — | WER 1.77 | — |
 
@@ -225,8 +256,8 @@ python audio_evals/main.py --dataset librispeech-test-clean --model audio-omni
 
 ## 8. 下一步
 
-1. 给生成类补齐 PANNs / VGGish 指标后端，并拿到 AudioCaps/MusicCaps 音频；
+1. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.3；服务器访问不到 GitHub）；
 2. 给 AudioEdit / TTS 准备 items.jsonl；
 3. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
 4. 在 UltraEval 上补 test-other / dev-clean，形成完整 ASR 基线；
-5. 修 RecA 相关实验：在这两个 benchmark 上对比 base / RecA 后训练。
+5. 修 RecA 实验：在同一批 T2A/T2M 数据上对比 base / RecA 后训练。

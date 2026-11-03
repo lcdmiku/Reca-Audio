@@ -92,15 +92,29 @@ def get_clap(device: str = "cuda"):
 
 
 def clap_audio_embeddings(files: Sequence[str], device: str = "cuda") -> np.ndarray:
+    return _clap_audio_embeddings_batched(files, device)
+
+
+def _clap_audio_embeddings_batched(files: Sequence[str], device: str, batch: int = 32) -> np.ndarray:
+    """分批算 CLAP 音频嵌入，避免上千条一次性进 GPU 导致 OOM。"""
     model = get_clap(device)
-    emb = model.get_audio_embedding_from_filelist(x=_as_files(files), use_tensor=False)
-    return np.asarray(emb, dtype=np.float64)
+    files = _as_files(files)
+    chunks = []
+    for i in range(0, len(files), batch):
+        emb = model.get_audio_embedding_from_filelist(x=files[i : i + batch], use_tensor=False)
+        chunks.append(np.asarray(emb, dtype=np.float64))
+    return np.concatenate(chunks, axis=0)
 
 
 def clap_text_audio_score(files: Sequence[str], texts: Sequence[str], device: str = "cuda") -> float:
     model = get_clap(device)
-    audio = np.asarray(model.get_audio_embedding_from_filelist(x=_as_files(files), use_tensor=False))
-    text = np.asarray(model.get_text_embedding(list(texts), use_tensor=False))
+    audio = _clap_audio_embeddings_batched(files, device)
+    texts = list(texts)
+    tchunks = []
+    for i in range(0, len(texts), 32):
+        emb = model.get_text_embedding(texts[i : i + 32], use_tensor=False)
+        tchunks.append(np.asarray(emb))
+    text = np.concatenate(tchunks, axis=0)
     audio = audio / (np.linalg.norm(audio, axis=1, keepdims=True) + 1e-8)
     text = text / (np.linalg.norm(text, axis=1, keepdims=True) + 1e-8)
     return float(np.mean(np.sum(audio * text, axis=1)))
@@ -115,18 +129,41 @@ def fad_clap(gen_files: Sequence[str], ref_files: Sequence[str], device: str = "
 
 
 def fad_vggish(gen_files: Sequence[str], ref_files: Sequence[str], sr: int = 16000) -> float:
-    """需要 fadtk；否则返回 nan。"""
+    """VGGish-FAD（fadtk）。
+
+    fadtk 的 `score(baseline_dir, eval_dir)` 收的是**目录**，所以先把文件链接/复制到临时目录。
+    """
     try:
-        from fadtk import FrechetAudioDistance
-        from fadtk.model_loader import VggishModel
+        import fadtk
     except Exception:
         print("[metrics] 未安装 fadtk，跳过 VGGish-FAD（pip install fadtk）")
         return float("nan")
+
+    import os
+    import shutil
+    import tempfile
+    from pathlib import Path
+
+    def _fill(src_files: Sequence[str], dst: Path) -> None:
+        dst.mkdir(parents=True, exist_ok=True)
+        for i, src in enumerate(src_files):
+            target = dst / f"{i:06d}.wav"
+            try:
+                os.link(src, target)
+            except OSError:
+                shutil.copy(src, target)
+
     try:
-        fad = FrechetAudioDistance(VggishModel())
-        return float(fad.score(_as_files(ref_files), _as_files(gen_files)))
+        model = fadtk.VGGishModel()
+        fad = fadtk.FrechetAudioDistance(model)
+        with tempfile.TemporaryDirectory() as tmp:
+            gen_dir = Path(tmp) / "gen"
+            ref_dir = Path(tmp) / "ref"
+            _fill(gen_files, gen_dir)
+            _fill(ref_files, ref_dir)
+            return float(fad.score(str(ref_dir), str(gen_dir)))
     except Exception as e:  # noqa: BLE001
-        print(f"[metrics] VGGish-FAD 计算失败：{e}")
+        print(f"[metrics] VGGish-FAD 计算失败：{type(e).__name__}: {e}")
         return float("nan")
 
 
@@ -151,7 +188,7 @@ def panns_outputs(files: Sequence[str], device: str = "cuda"):
     model = get_panns(device)
     logits, embeds = [], []
     for path in _as_files(files):
-        wav, sr = _load_fixed_32k(path)
+        wav = _load_fixed_32k(path)
         with torch.no_grad():
             clipwise, embedding = model.inference(wav[None, :])
         logits.append(np.asarray(clipwise).reshape(-1))

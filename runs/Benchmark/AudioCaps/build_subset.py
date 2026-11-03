@@ -36,7 +36,19 @@ def main() -> int:
     ap.add_argument("--ref-dir", default="runs/Benchmark/_data/audiocaps/ref")
     ap.add_argument("--out-jsonl", default="runs/Benchmark/AudioCaps/prompts.jsonl")
     ap.add_argument("--max-items", type=int, default=0)
+    ap.add_argument("--ids-csv", default="", help="官方 test.csv；只保留其中的 audiocap_id")
+    ap.add_argument("--id-cols", default="audiocap_id", help="逗号分隔的 id 列，拼成唯一 id")
     args = ap.parse_args()
+
+    id_cols = [c.strip() for c in args.id_cols.split(",") if c.strip()]
+
+    allow = None
+    if args.ids_csv:
+        import csv
+
+        with open(args.ids_csv, newline="", encoding="utf-8") as f:
+            allow = {str(r["audiocap_id"]).strip() for r in csv.DictReader(f)}
+        print(f"[ids] 官方 test.csv: {len(allow)} 个 id")
 
     shards = sorted(p for p in glob.glob(str(Path(args.shards_dir) / args.pattern)) if valid(p))
     if not shards:
@@ -45,14 +57,36 @@ def main() -> int:
     ref_dir = Path(args.ref_dir)
     ref_dir.mkdir(parents=True, exist_ok=True)
 
+    # 第一遍：只读 id 列，定位命中分片（全量 41 GB，全读太慢）
+    if allow is not None:
+        hits = {}
+        for path in shards:
+            try:
+                table = pq.read_table(path, columns=id_cols)
+            except Exception:  # noqa: BLE001
+                continue
+            ids = {
+                "_".join(str(table.column(c)[i].as_py()) for c in id_cols)
+                for i in range(table.num_rows)
+            }
+            common = ids & allow
+            if common:
+                hits[path] = common
+        print(f"[scan] {len(hits)}/{len(shards)} 个分片命中，共 {sum(len(v) for v in hits.values())} 条")
+        shards = sorted(hits)
+    else:
+        hits = {p: None for p in shards}
+
     rows, seen = [], set()
     for path in shards:
         pf = pq.ParquetFile(path)
         for rg in range(pf.num_row_groups):
-            table = pf.read_row_group(rg, columns=["audiocap_id", "caption", "audio"])
+            table = pf.read_row_group(rg, columns=id_cols + ["caption", "audio"])
             for i in range(table.num_rows):
-                cid = str(table.column("audiocap_id")[i].as_py())
+                cid = "_".join(str(table.column(c)[i].as_py()) for c in id_cols)
                 if cid in seen:
+                    continue
+                if allow is not None and cid not in allow:
                     continue
                 cap = table.column("caption")[i].as_py()
                 audio = table.column("audio")[i].as_py() or {}
