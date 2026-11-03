@@ -50,6 +50,43 @@ audio ──16kHz────► Qwen2.5-Omni thinker ──┘
 实测：**3.1 s/step**（batch=1、grad_accum=1、5 s、Adafactor+AMP+VAE on CPU），
 GPU0 峰值约 30 GB（30.4 亿参数 fp32 + 梯度 + 激活）。
 
+## 多卡训练（实际采用的方案）
+
+和推理时的组件并行一致：每个进程占两张卡，**偶数卡放 DiT，奇数卡放冻结的理解塔 + VAE**。
+
+```
+rank i:  DiT (fp16)      -> cuda:(2i)      ~18.5 GB
+         理解塔 + VAE     -> cuda:(2i+1)    ~21 GB
+```
+
+4 个进程覆盖 8 张 V100，DDP 做梯度同步。实测 **1.83 s/step**（5 s 片段、batch 1），
+2000 步约 65 分钟。
+
+```bash
+bash runs/scripts/train_reca_ddp.sh                          # 2000 步
+SMOKE=1 bash runs/scripts/train_reca_ddp.sh                  # 2 步冒烟
+```
+
+关键取舍：
+
+| 手段 | 原因 |
+|---|---|
+| DiT 权重 **fp16** | fp32 的 12 GB 参数 + 12 GB 梯度放不下；fp16 后稳定在 18.5 GB |
+| 关掉 GradScaler | fp16 参数产生 fp16 梯度，`unscale_` 会直接报错 |
+| `gradient_as_bucket_view` + `static_graph` | DDP 梯度桶复用，省 1–2 GB |
+| VAE 放辅助卡且强制 fp32 | 与理解塔同卡，编码后只搬几十 MB 回 DiT 卡 |
+
+### 提示词多样化
+
+`runs/scripts/const.py` 的 `get_audio_recon_prompt_list()` 提供 **357 条**音频重建指令
+（对应 ReCA 原文“多样化提示词防僵化”）。训练时每条样本随机抽一条：
+
+```python
+"text_prompt": sample_recon_prompt()
+```
+
+找不到 `const.py` 时退回固定指令 `Describe the audio.`。
+
 ## 用法
 
 ```bash
