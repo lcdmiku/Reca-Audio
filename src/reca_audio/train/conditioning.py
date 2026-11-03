@@ -12,7 +12,10 @@ config 里的 conditioning.configs[].id 对应：
 """
 from __future__ import annotations
 
+import importlib.util
+import random
 import typing as tp
+from pathlib import Path
 
 import torch
 
@@ -20,12 +23,56 @@ from audio_omni.prompts import build_prompt
 
 EMPTY_SYNC_DIM = (1, 240, 768)
 
-# ReCA 的文本指令：所有样本共用同一条，保证条件信息全部来自音频 token。
+# 兜底指令；正式训练用 runs/scripts/const.py 里的多样化提示词
 RECA_INSTRUCTION = "Describe the audio."
 
 # audio_input_prompt 的 mel 投影层在 config 里写死 1723 帧 = 10.0 s @44.1kHz/hop256。
 # 它和扩散头的 sample_size（485100 采样 = 11 s）不是同一个长度，必须分开处理。
 MEL_SECONDS = 10.0
+
+_PROMPTS: tp.Optional[tp.List[str]] = None
+
+
+def recon_prompts(const_path: str = "") -> tp.List[str]:
+    """加载 `runs/scripts/const.py` 里的音频重建提示词列表（带缓存）。"""
+    global _PROMPTS
+    if _PROMPTS is not None:
+        return _PROMPTS
+
+    candidates = []
+    if const_path:
+        candidates.append(Path(const_path))
+    here = Path(__file__).resolve()
+    candidates.append(here.parents[3] / "runs" / "scripts" / "const.py")  # repo root/runs/scripts
+
+    for path in candidates:
+        if not path.is_file():
+            continue
+        spec = importlib.util.spec_from_file_location("_reca_const", path)
+        if spec is None or spec.loader is None:
+            continue
+        module = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(module)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[conditioning] 读取 {path} 失败：{exc}")
+            continue
+        getter = getattr(module, "get_audio_recon_prompt_list", None)
+        if callable(getter):
+            prompts = [p for p in getter() if isinstance(p, str) and p.strip()]
+            if prompts:
+                _PROMPTS = prompts
+                print(f"[conditioning] 载入 {len(prompts)} 条重建提示词 <- {path}")
+                return _PROMPTS
+
+    _PROMPTS = [RECA_INSTRUCTION]
+    print("[conditioning] 未找到 const.py，退回固定指令")
+    return _PROMPTS
+
+
+def sample_recon_prompt() -> str:
+    return random.choice(recon_prompts())
+
 
 
 def _zero_sync(device: tp.Union[str, torch.device]) -> torch.Tensor:
@@ -47,8 +94,8 @@ def build_reca_metadata(
     return {
         "omni_prompt": {
             # Qwen2_5OmniProcessor 不接受纯音频输入，必须带 text；
-            # 用固定指令，避免文本语义混进条件。
-            "text_prompt": RECA_INSTRUCTION,
+            # 每条样本随机抽一条重建指令（对应 ReCA 原文“多样化提示词防僵化”）。
+            "text_prompt": sample_recon_prompt(),
             "video_prompt": None,
             "audio_prompt": clip.audio_omni.float().cpu().numpy(),
         },
