@@ -87,6 +87,27 @@ SMOKE=1 bash runs/scripts/train_reca_ddp.sh                  # 2 步冒烟
 
 找不到 `const.py` 时退回固定指令 `Describe the audio.`。
 
+### ⚠️ 必须用 `build_prompt("Reconstruct", …)` 包装
+
+第一次正式训练（2000 步）把 const.py 的提示词**裸着**当 user text 喂给理解塔，结果模型塌缩：
+
+| 模型 | 重建同一段音频的频谱平坦度 |
+|---|---|
+| 原始 Audio-Omni | **0.032**（结构化） |
+| 裸提示词训练 2000 步 | **0.600**（白噪声） |
+| 加 `Reconstruct` 包装训练 300 步 | **0.048**（接近原始） |
+
+原因：Audio-Omni 预训练用的是 `SYSTEM_RECONSTRUCT` 系统模板，裸文本会让理解塔输出
+OOD 特征，DiT 学不到条件、退化成输出噪声（CLIP score 甚至为负）。
+
+正确写法（`conditioning.py`）：
+
+```python
+"text_prompt": build_prompt("Reconstruct", sample_recon_prompt()),
+```
+
+多样性来自 357 条模板文本，任务包装必须与预训练一致。
+
 ## 用法
 
 ```bash

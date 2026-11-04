@@ -93,9 +93,11 @@ def build_reca_metadata(
     zeros_wav = torch.zeros(int(sample_rate * MEL_SECONDS), dtype=torch.float32, device=device)
     return {
         "omni_prompt": {
-            # Qwen2_5OmniProcessor 不接受纯音频输入，必须带 text；
-            # 每条样本随机抽一条重建指令（对应 ReCA 原文“多样化提示词防僵化”）。
-            "text_prompt": sample_recon_prompt(),
+            # Qwen2_5OmniProcessor 不接受纯音频输入，必须带 text。
+            # 关键：Audio-Omni 预训练用的是 build_prompt("Reconstruct", ...) 的系统模板；
+            # 裸文本会让理解塔输出 OOD 特征，DiT 会直接学崩（实测输出白噪声）。
+            # 多样性由 const.py 的 357 条模板提供，任务包装保持不变。
+            "text_prompt": build_prompt("Reconstruct", sample_recon_prompt()),
             "video_prompt": None,
             "audio_prompt": clip.audio_omni.float().cpu().numpy(),
         },
