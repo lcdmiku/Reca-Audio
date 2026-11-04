@@ -24,8 +24,10 @@ def rectified_flow_loss(
     t = torch.rand(b, device=latents.device, dtype=latents.dtype, generator=generator)
 
     shape = (b, 1, 1)
-    x_t = (1 - t.view(shape)) * noise + t.view(shape) * latents
-    target = latents - noise
+    # 与 sample_discrete_euler 对齐：t=1 是纯噪声、t=0 是数据，
+    # x_t = (1-t) * x1 + t * eps，回归 v = dx/dt = eps - x1。
+    x_t = (1 - t.view(shape)) * latents + t.view(shape) * noise
+    target = noise - latents
 
     pred = dit(x_t, t, **cond_inputs, cfg_dropout_prob=cfg_dropout_prob)
     if isinstance(pred, tuple):
