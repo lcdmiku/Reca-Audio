@@ -1,77 +1,132 @@
 # RecA-Audio
 
-把 *Reconstruction Alignment*（[arXiv:2509.07295](https://arxiv.org/abs/2509.07295)）迁移到**音频生成后训练**的课程项目。
+把 **Reconstruction Alignment（ReCA, [arXiv:2509.07295](https://arxiv.org/abs/2509.07295)）** 迁移到
+**Audio-Omni**（SIGGRAPH 2026：冻结 Qwen2.5-Omni-3B 理解塔 + 可训练 DiT）的音频生成后训练，
+并搭一套可复现的音频理解 / 生成评测。
 
-核心问题不是"能不能涨点"，而是：**音频理解编码器里还剩多少可重建的声学信息，这个信息量如何决定迁移收益**——预期是一条倒 U 曲线。
+> 课程项目。核心问题：**音频理解编码器里还剩多少可重建的声学信息，这个信息量如何决定迁移收益。**
 
-## 文档
+---
 
-| 文件 | 内容 |
-|---|---|
-| [RecA-Audio-实验思路.md](RecA-Audio-实验思路.md) | 完整思路、假设、机制分析 |
-| [RecA-Audio-执行方案-课程报告版.md](RecA-Audio-执行方案-课程报告版.md) | 课程报告版：实验清单与报告结构 |
-| [RecA-Audio-两周冲刺方案.md](RecA-Audio-两周冲刺方案.md) | 两周冲刺：V100 约束与日计划 |
-| [执行清单-D0到D14.md](执行清单-D0到D14.md) | 逐项待办 |
-| [server/README.md](server/README.md) | 服务器侧环境与约定 |
+## 当前状态（2026-11-05）
+
+| 模块 | 状态 | 位置 |
+|---|---|---|
+| Audio-Omni 推理（T2A / T2M / 编辑 / 理解） | ✅ 双卡组件并行，V100 可跑 | `Audio-Omni/` |
+| 理解评测 MMSU / MMAU | ✅ 全量跑完：**59.70 % / 57.70 %** | `runs/Benchmark/{MMSU,MMAU}` |
+| 生成评测 AudioCaps / MusicCaps | ✅ 基线：CLAP-FAD **0.2230 / 0.3140** | `runs/Benchmark/{AudioCaps,MusicCaps}` |
+| ReCA 后训练 | 🔄 修复关键 bug 后重训 b6，评测进行中 | `src/reca_audio/train/` |
+| VGGish-FAD | ⛔ 缺权重（只有 GitHub 渠道） | — |
+
+全部数字与协议说明见 **[docs/result.md](docs/result.md)**。
+
+---
 
 ## 快速开始（服务器）
 
 ```bash
-# 0) 环境（克隆已有的 dl 环境，复用其中能在 V100 上跑的 torch）
-bash server/setup_env.sh
-conda activate reca-audio
+# 环境
+conda activate audio-omni            # python 3.11 / torch 2.6.0+cu124 / transformers 4.57.3
+cd ~/Reca-Audio
 
-# 0.1) HuggingFace 走镜像（服务器上 huggingface.co 不通）
-export HF_ENDPOINT=https://hf-mirror.com
+# 必需的环境变量
+export QWEN_OMNI_MODEL_PATH=$(ls -d ~/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots/*/ | head -1)
+export HF_ENDPOINT=https://hf-mirror.com          # 服务器直连 huggingface.co 不通
+export HF_HUB_DOWNLOAD_TIMEOUT=300 HF_HUB_ETAG_TIMEOUT=300
+export CLAP_CKPT=~/.cache/laion_clap/630k-audioset-best.pt
 
-# 1) 路径
-export DATA_ROOT=/path/to/data/reca-audio
-export RUN_ROOT=/path/to/runs/reca-audio
+# 一次生成类评测（4 分片 × 2 卡）
+INPUT=$PWD/runs/Benchmark/_data/audiocaps/full/prompts1000.jsonl \
+REF=$PWD/runs/Benchmark/_data/audiocaps/full2/ref \
+OUT=$PWD/runs/Benchmark/output/AudioCaps_try \
+  bash runs/Benchmark/run_shards.sh --benchmark AudioCaps
 
-# 2) 体检（第一次必跑，把输出贴回来）
-bash server/00_check_env.sh
-
-# 3) 下载数据（FSD50K ~80h 音效 + FMA-small ~66h 音乐，约 26 GB）
-bash scripts/00_download_data.sh all
-
-# 4) 预处理（先冒烟 200 个）
-LIMIT=200 bash scripts/01_preprocess.sh
-bash scripts/01_preprocess.sh
+# 理解类评测
+bash runs/Benchmark/run_shards.sh --benchmark MMSU     # 需先 prepare 出 items.jsonl
 ```
 
-预处理后应得到：
+ReCA 训练：
 
+```bash
+SMOKE=1 bash runs/scripts/train_reca.sh        # 2 步冒烟
+STEPS=2000 bash runs/scripts/train_reca.sh     # 单进程 fp32 主权重
+bash runs/scripts/train_reca_ddp.sh            # 4 进程 × 2 卡（DDP，供参考）
 ```
-$DATA_ROOT/processed/fsd50k/index.jsonl
-$DATA_ROOT/processed/fsd50k/manifest.json
-$DATA_ROOT/processed/fma/index.jsonl
-$DATA_ROOT/processed/fma/manifest.json
-```
+
+---
 
 ## 仓库结构
 
 ```
+RecA-Audio/
+├── Audio-Omni/                    # 上游模型代码（含我们为 V100/RecA 做的补丁）
+│   ├── audio_omni/                #   loader / conditioners / dit / api
+│   └── model/                     #   Audio-Omni.json + model.ckpt(21G) + model_reca_b6.ckpt(33G)
 ├── src/reca_audio/
-│   └── data/preprocess.py      # 格式归一 + 响度归一 + 去重
-├── scripts/
-│   ├── 00_download_data.sh     # FSD50K / FMA-small
-│   └── 01_preprocess.sh
-├── server/
-│   ├── environment.yml         # V100 专用（cu121, python 3.10）
-│   ├── 00_check_env.sh
-│   └── README.md
-└── docs 见上表
+│   ├── data/preprocess.py         # 早期数据预处理（未用于当前流程）
+│   └── train/                     # ★ ReCA 训练：数据、条件、flow loss、训练循环、合并
+├── runs/
+│   ├── Benchmark/                 # ★ 评测：MMSU / MMAU / AudioCaps / MusicCaps + common/
+│   │   ├── _data/                 #   数据（gitignored）
+│   │   └── output/                #   结果（gitignored）
+│   ├── scripts/                   # 启停脚本：train_* / pipeline_* / deploy.* / const.py
+│   └── train/                     # 训练日志与检查点（gitignored）
+├── docs/                          # 见下方文档索引
+└── pyproject.toml
 ```
 
-## V100 三条铁律
+大文件（`runs/Benchmark/_data`、`output`、`runs/train`、`*.ckpt`）都不入库。
 
-1. 永不 `bfloat16`，用 `float16` + `GradScaler`
-2. 不装 `flash-attn` / `xformers`
-3. 不装 cu128+ 的 torch（不带 sm70 内核）
+---
 
-## 数据许可
+## 文档索引
 
-- FSD50K：CC-BY（部分 clip 为 CC-BY-NC / Sampling+，见 `dev_clips_info_FSD50K.json`）
-- FMA-small：CC-BY / 部分 CC-BY-NC-SA，见官方 metadata
+| 文档 | 用途 |
+|---|---|
+| [docs/result.md](docs/result.md) | **所有评测数字**、指标方向约定、可比性说明 |
+| [docs/reca_training.md](docs/reca_training.md) | ReCA 训练设计、显存策略、踩过的坑 |
+| [docs/deploy.md](docs/deploy.md) | 本地→服务器的部署流程（三个保险） |
+| [docs/Audio-Omni-RecA-CHANGES.md](docs/Audio-Omni-RecA-CHANGES.md) | 对上游 Audio-Omni 的每一处改动 |
+| [docs/Audio-Omni.txt](docs/Audio-Omni.txt) | Audio-Omni 论文纯文本 |
+| `docs/RecA-Audio-*.md`、`docs/执行清单-D0到D14.md` | 早期选题与冲刺方案（历史材料） |
 
-仅用于课程研究，不再分发原始音频。
+---
+
+## 数据来源
+
+| 数据 | 来源 | 本地位置 |
+|---|---|---|
+| AudioCaps（4411 条音频 + caption） | Gitee LFS `hf-datasets/OpenSound-AudioCaps` | `runs/Benchmark/_data/audiocaps/full2/` |
+| MusicCaps（1004 条） | HF `mahendra0203/musiccaps_processed` | `runs/Benchmark/_data/musiccaps/` |
+| MMSU / MMAU | HF parquet | `runs/Benchmark/_data/hf/` |
+
+AudioCaps 的原始 41 GB 分片为省磁盘已删除，需要重建子集时按 `docs/result.md` 里的命令重新拉取。
+
+---
+
+## 关键坑（都已踩过，务必先读）
+
+1. **`<|AUDIO|>` 占位符**：Reconstruct 的 prompt 必须含该 token，否则 processor 只产出 1 个文本 token，
+   音频被静默丢弃（不同音频的条件特征完全相同）。`docs/reca_training.md` 有完整证据链。
+2. **重建不能开 CFG**：`cfg_scale>1` 会把 cross-attn 条件整体置零，实测重建质量从平坦度 0.03–0.09
+   退化到 0.13–0.26。T2A 才用 CFG。
+3. **fp16 主权重会吃掉更新**：每步 |Δw| 约 1e-7，被 fp16 舍入吃掉；必须 fp32 主权重 + autocast。
+4. **Reconstruct 必须用系统模板**：`build_prompt("Reconstruct", …)`，裸文本会让理解塔输出 OOD 特征。
+5. **V100（sm70）**：只能 fp16，无 bf16 / FlashAttention / TF32。
+6. **HF 镜像会超时**：默认 10 s 读超时，需 `HF_HUB_DOWNLOAD_TIMEOUT=300`。
+
+---
+
+## 给 agent / 新同学的入口
+
+1. 先读 [docs/result.md](docs/result.md)（结论与数字）和 [docs/reca_training.md](docs/reca_training.md)（坑）。
+2. **服务器代码只能通过部署流程同步**，规则见 [docs/deploy.md](docs/deploy.md)：
+   本地是唯一真源，`runs/scripts/deploy.ps1` + `deploy.sh` 会校验 hash 并写 `DEPLOYED_COMMIT`。
+   不要在服务器上直接改代码（曾因此把本地文件编码写坏）。
+3. 约束：**不用 sudo**、只在 `/home/linchudeng/` 下操作、不要删除他人文件。
+4. 评测协议各不相同，**不要跨协议比较数字**（MMSU/MMAU 用官方脚本，AudioCaps/MusicCaps 用自建 harness）。
+
+## 许可
+
+课程研究用途。Audio-Omni 模型与代码遵循上游许可；AudioCaps / MusicCaps / MMSU / MMAU
+遵循各自数据集许可，不分发原始音频。
