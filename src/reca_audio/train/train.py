@@ -16,6 +16,7 @@ import argparse
 import json
 import math
 import os
+import random
 import time
 from pathlib import Path
 from typing import Any, Dict
@@ -28,6 +29,7 @@ from audio_omni.loader import load_model_bundle
 from .conditioning import build_reca_metadata, build_t2a_metadata
 from .data import AudioManifestDataset, collate_clips
 from .flow import rectified_flow_loss
+from .scheduling import choose_task_mode
 
 try:  # 允许直接 `python src/reca_audio/train/train.py`
     from . import __name__ as _pkg  # noqa: F401
@@ -100,7 +102,9 @@ def move_cond(tensors: Dict[str, Any], device: torch.device) -> Dict[str, Any]:
     return out
 
 
-def build_metadata(batch: Dict[str, Any], idx: int, mode: str, args, device):
+def build_metadata(
+    batch: Dict[str, Any], idx: int, mode: str, args, device, prompt_rng=None
+):
     clip = type("Clip", (), {
         "audio_omni": batch["audio_omni"][idx],
         "caption": batch["caption"][idx],
@@ -110,18 +114,31 @@ def build_metadata(batch: Dict[str, Any], idx: int, mode: str, args, device):
     return build_reca_metadata(
         clip, device=device, seconds=args.seconds, sample_rate=args.sample_rate,
         omni_downsample=args.omni_downsample, omni_seconds=args.omni_seconds,
+        prompt_rng=prompt_rng,
     )
 
 
 def main() -> int:
     args = parse_args()
+    choose_task_mode(args.task_mode, args.lambda_reca, args.lambda_t2a, 0.0)
+    random.seed(args.seed)
     torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(args.seed)
+
+    data_generator = torch.Generator()
+    data_generator.manual_seed(args.seed + 11)
+    task_generator = torch.Generator()
+    task_generator.manual_seed(args.seed + 12)
+    prompt_rng = random.Random(args.seed + 13)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     (out / "args.json").write_text(json.dumps(vars(args), indent=2, ensure_ascii=False), encoding="utf-8")
 
     device = torch.device(args.device)
     cond_device = torch.device(args.conditioner_device)
+    flow_generator = torch.Generator(device=device)
+    flow_generator.manual_seed(args.seed + 14)
 
     print(f"[build] DiT/VAE -> {device} | conditioner -> {cond_device} | dtype={args.dtype}", flush=True)
     model, model_config, sample_rate, sample_size = load_model_bundle(
@@ -157,6 +174,7 @@ def main() -> int:
         collate_fn=collate_clips,
         drop_last=True,
         persistent_workers=args.num_workers > 0,
+        generator=data_generator,
     )
     print(f"[data] {len(dataset)} clips | batch={args.batch_size} | accum={args.grad_accum}", flush=True)
 
@@ -177,11 +195,30 @@ def main() -> int:
     scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
 
     start_step = 0
+    task_counts = {"reca": 0, "t2a": 0}
     if args.resume and Path(args.resume).exists():
         state = torch.load(args.resume, map_location="cpu")
         dit.load_state_dict(state["dit"])
         optim.load_state_dict(state["optim"])
+        if "scaler" in state:
+            scaler.load_state_dict(state["scaler"])
         start_step = int(state.get("step", 0))
+        task_counts.update(state.get("task_counts", {}))
+        rng = state.get("rng", {})
+        if "python" in rng:
+            random.setstate(rng["python"])
+        if "prompt" in rng:
+            prompt_rng.setstate(rng["prompt"])
+        if "torch" in rng:
+            torch.set_rng_state(rng["torch"])
+        if torch.cuda.is_available() and rng.get("cuda"):
+            torch.cuda.set_rng_state_all(rng["cuda"])
+        if "data_generator" in rng:
+            data_generator.set_state(rng["data_generator"])
+        if "task_generator" in rng:
+            task_generator.set_state(rng["task_generator"])
+        if "flow_generator" in rng:
+            flow_generator.set_state(rng["flow_generator"])
         print(f"[resume] from {args.resume} @ step {start_step}", flush=True)
 
     log_path = out / "train_log.jsonl"
@@ -189,9 +226,20 @@ def main() -> int:
 
     def save(step: int) -> None:
         payload = {
-            "dit": {k: v.detach().half().cpu() for k, v in dit.state_dict().items()},
+            "dit": {k: v.detach().float().cpu() for k, v in dit.state_dict().items()},
             "optim": optim.state_dict(),
+            "scaler": scaler.state_dict(),
             "step": step,
+            "task_counts": dict(task_counts),
+            "rng": {
+                "python": random.getstate(),
+                "prompt": prompt_rng.getstate(),
+                "torch": torch.get_rng_state(),
+                "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
+                "data_generator": data_generator.get_state(),
+                "task_generator": task_generator.get_state(),
+                "flow_generator": flow_generator.get_state(),
+            },
             "args": vars(args),
         }
         path = out / f"dit_step{step:06d}.pt"
@@ -209,6 +257,7 @@ def main() -> int:
     it = iter(loader)
     t0 = time.time()
     running: list[float] = []
+    mode_running: dict[str, list[float]] = {"reca": [], "t2a": []}
     step = start_step
     while step < args.steps:
         optim.zero_grad(set_to_none=True)
@@ -225,13 +274,15 @@ def main() -> int:
                 latents = model.pretransform.encode(audio.to(vae_device)).detach().to(device)
                 # 混合训练按 batch 统一选任务，避免同一 batch 里 ReCA/T2A 混排
                 # （conditioner 会各自过滤 None 音频，混排可能破坏 batch 对齐）
-                batch_mode = args.task_mode
-                if batch_mode == "mix":
-                    p_reca = args.lambda_reca / max(1e-9, args.lambda_reca + args.lambda_t2a)
-                    batch_mode = "reca" if torch.rand(1).item() < p_reca else "t2a"
+                draw = float(torch.rand((), generator=task_generator).item())
+                batch_mode = choose_task_mode(
+                    args.task_mode, args.lambda_reca, args.lambda_t2a, draw
+                )
                 # 条件在 conditioner 所在卡上构造
                 metas = [
-                    build_metadata(batch, i, batch_mode, args, cond_device)
+                    build_metadata(
+                        batch, i, batch_mode, args, cond_device, prompt_rng=prompt_rng
+                    )
                     for i in range(len(batch["caption"]))
                 ]
                 cond_tensors = model.conditioner(metas, cond_device)
@@ -242,9 +293,12 @@ def main() -> int:
                 loss, stats = rectified_flow_loss(
                     dit, latents, cond_inputs,
                     cfg_dropout_prob=args.cfg_dropout,
+                    generator=flow_generator,
                 )
             scaler.scale(loss / args.grad_accum).backward()
             accum_loss += stats["loss"]
+            task_counts[batch_mode] += 1
+            mode_running[batch_mode].append(stats["loss"])
 
         for g in optim.param_groups:
             g["lr"] = lr_at(step, args)
@@ -264,10 +318,26 @@ def main() -> int:
                 "loss": round(recent, 5),
                 "lr": optim.param_groups[0]["lr"],
                 "sec_per_step": round(dt, 3),
+                "reca_count": task_counts["reca"],
+                "t2a_count": task_counts["t2a"],
+                "reca_loss": (
+                    round(sum(mode_running["reca"][-args.log_every:]) / len(mode_running["reca"][-args.log_every:]), 5)
+                    if mode_running["reca"]
+                    else None
+                ),
+                "t2a_loss": (
+                    round(sum(mode_running["t2a"][-args.log_every:]) / len(mode_running["t2a"][-args.log_every:]), 5)
+                    if mode_running["t2a"]
+                    else None
+                ),
             }
             log_f.write(json.dumps(rec) + "\n")
             log_f.flush()
-            print(f"[step {step}/{args.steps}] loss={recent:.5f} lr={rec['lr']:.2e} {dt:.2f}s/step", flush=True)
+            print(
+                f"[step {step}/{args.steps}] loss={recent:.5f} lr={rec['lr']:.2e} "
+                f"modes=R{task_counts['reca']}/T{task_counts['t2a']} {dt:.2f}s/step",
+                flush=True,
+            )
 
         if args.save_every and step % args.save_every == 0:
             save(step)
