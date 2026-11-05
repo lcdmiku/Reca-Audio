@@ -1,5 +1,54 @@
 # ReCA 后训练
 
+## Formal mixed-training protocol (2026-11-05)
+
+The immediate mechanism experiment uses the versioned
+`runs/Benchmark/_data/audiocaps/reca_split_v1` split. Audio files are grouped by
+SHA256 before a seeded 80/10/10 assignment, so byte-identical clips cannot
+cross train/validation/test boundaries. `split_report.json` must report zero
+ID and SHA256 intersections for every pair. This internal holdout makes the
+mechanism comparison credible; the official AudioCaps test and MusicCaps remain
+second-stage external evaluation sets.
+
+All trained arms start from the same original Audio-Omni checkpoint and use
+the same train manifest, 2,000 optimizer steps, seed 42, batch size 1,
+gradient accumulation 1, Adafactor, learning rate 2e-5, 100 warmup steps,
+fp32 master weights with fp16 AMP, 5-second targets, 4x Qwen audio low-pass
+bottleneck, no temporal crop, and CFG dropout 0. The current semantic
+Reconstruct prompt contract is shared by all arms.
+
+| Arm | `task_mode` | `lambda_reca` | `lambda_t2a` | GPUs | Hypothesis |
+|---|---:|---:|---:|---:|---|
+| Base | no update | - | - | evaluation only | Original text conditioning reference |
+| Pure ReCA | `reca` | 1 | 0 | 0,1 | Reconstruction alignment alone can damage T2A |
+| T2A-only | `t2a` | 0 | 1 | 2,3 | Controls for continued training without audio-conditioned ReCA |
+| Mix 1:1 | `mix` | 1 | 1 | 4,5 | Text supervision may preserve T2A while retaining reconstruction alignment |
+
+`task_mode=mix` does **not** compute both losses on every batch. It samples one
+task per batch with probability proportional to the two lambdas, then computes
+only that task's loss. Thus the 1:1 configuration is a stochastic estimator of
+an equally weighted objective in expectation, not an exact per-batch sum
+`lambda_R * L_ReCA + lambda_T * L_T2A`. Logs record cumulative task counts so
+the realized schedule can be audited.
+
+Commands:
+
+```bash
+python -m reca_audio.train.split_manifest \
+  --manifest runs/Benchmark/_data/audiocaps/train_manifest.jsonl \
+  --out runs/Benchmark/_data/audiocaps/reca_split_v1 --seed 42
+
+ROOT=runs/train/reca_matrix_smoke bash runs/scripts/train_reca_matrix.sh smoke
+ROOT=runs/train/reca_matrix_v1 bash runs/scripts/train_reca_matrix.sh launch
+ROOT=runs/train/reca_matrix_v1 bash runs/scripts/train_reca_matrix.sh status
+```
+
+The launcher refuses non-empty arm directories; choose a new versioned `ROOT`
+instead of deleting or reusing an existing experiment. Cache regeneration is
+not required because conditioning is computed online, but any future cached
+Qwen features become invalid after changing prompt, hidden layer, token
+selection, pooling, or compression.
+
 把 Audio-Omni 的生成头（DiT）对齐到理解塔的表征：**给一段音频，让理解塔编码它，
 生成头再把它重建成同一段音频**。这是 ReCA 在音频上的直接搬运。
 
