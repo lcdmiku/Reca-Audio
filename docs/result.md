@@ -169,7 +169,89 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 - 代码就绪，**缺数据**；TTS 的 WER 还需 Whisper（当前默认 small，论文用 large 级）。
 - 论文参考：AE_FAD 3.27 / AE_LSD 2.27 / CLAP 0.32；TTS_WER 1.77。
 
-## 5. 状态总览
+## 5. ReCA 后训练实验
+
+### 5.1 方法
+
+冻结 VAE 与理解塔，只训练 **DiT（3037.3 M 参数）**：
+
+- 条件：同一段音频经 Qwen2.5-Omni thinker，`build_prompt("Reconstruct", 随机模板)`；
+  模板来自 `runs/scripts/const.py` 的 357 条，保证多样性；
+- 防泄漏：`audio_input_prompt`（mel 条件）固定传零，避免模型直接从 mel 抄声学细节；
+- 目标：rectified flow，`x_t=(1-t)·x1 + t·ε`、`v=ε−x1`，与 `sample_discrete_euler` 一致；
+- **信息瓶颈**（模仿原文“输入降分辨率、输出不变”）：只对理解塔输入做低通与随机截断，
+  重建目标始终是完整 44.1 kHz、未压缩的原始音频。
+
+### 5.2 训练轮次
+
+| 代号 | 步数 | lr | 精度 | 瓶颈 | 优化器 | 末段 loss |
+|---|---|---|---|---|---|---|
+| v3 | 600 | 1e-5 | fp16 | 无 | Adafactor | 1.066 |
+| b2 | 300 | 2e-5 | fp32 | 低通 2× + 3 s | Adafactor | ~1.00 |
+| b3 | 3000 | 2e-5 | fp32 | 低通 2× + 3 s | Adafactor | 1.061 |
+| b4 | 2000 | 2e-5 | fp32 | 低通 4× + 1.5 s | Adafactor | 1.059 |
+
+参考：**预训练模型在同一瓶颈配置下 loss = 1.07 ± 0.04**（8 个种子）。
+所有轮次的 loss 都在 1.0–1.07 附近徘徊，没有实质下降。
+
+详细分段：
+
+| 轮次 | 0–500 | 500–1000 | 1000–1500 | 1500–2000 | 2000–2500 | 2500–3000 |
+|---|---|---|---|---|---|---|
+| b3 | 1.067 | 1.072 | 1.072 | 1.069 | 1.060 | 1.061 |
+| b4 | 1.067 | 1.067 | 1.059 | 1.059 | — | — |
+
+### 5.3 评测结果
+
+**AudioCaps（1000 条，T2A）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLIP ↑ |
+|---|---|---|---|---|---|
+| 基线（原始 ckpt） | **0.2230** | **2.196** | **7.706** | **43.83** | **0.4575** |
+| v3（600 步） | 0.2228 | 2.182 | 7.626 | 43.01 | 0.4613 |
+| b3（3000 步，瓶颈 2×/3 s） | 0.2794 | — | — | — | 0.3606 |
+| b4（2000 步，瓶颈 4×/1.5 s） | 评测中 | — | — | — | — |
+
+**MusicCaps（1004 条，T2M）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLIP ↑ |
+|---|---|---|---|---|---|
+| 基线 | **0.3140** | **1.325** | 3.386 | **18.55** | **0.3909** |
+| v3（600 步） | 0.3018 | 1.337 | **3.409** | 18.64 | 0.3923 |
+
+### 5.4 关键发现
+
+1. **两个致命 bug（已修）**
+   - 提示词少了 `build_prompt("Reconstruct", …)` 包装 → 理解塔输出 OOD 特征 → 生成白噪声
+     （频谱平坦度 0.600 vs 正常 0.032，CLIP −0.048）；
+   - flow 方向写反（用了 `x1−ε` 而不是 `ε−x1`）→ loss 在降、采样全是噪声。
+     证据：原始模型在两种目标下 loss 分别为 **3.04 / 0.98**。
+2. **fp16 主权重吃掉了权重更新**：每步 |Δw| 仅 1.7e-7，而 fp32 为 6.1e-6（36×）。
+   fp16 在 |w|≈0.5 的可表示间隔是 4.9e-4，lr 1e-5 的更新直接被舍入掉。
+3. **lr 1e-4 过大**：loss 从 1.10 涨到 1.31（高于预训练 1.07），已中止。
+4. **纯 ReCA（λ_T2A=0）会牺牲文本生成能力**：b3 训到 3000 步后
+   AudioCaps FAD 0.2230 → 0.2794（+25%）、CLIP 0.4575 → 0.3606（−21%）。
+5. **加强瓶颈没有改变 loss 平台**：b4 把低通从 2× 加到 4×、条件时长从 3 s 压到 1.5 s，
+   loss 仍是 1.067 → 1.059，说明这批数据上可学余量很小。
+
+### 5.5 结论
+
+- 在当前数据规模（4411 条 AudioCaps）下，**纯重建对齐学不到超过预训练的东西**，
+  且会把生成头往重建方向拉、损害 T2A；
+- 这与 ReCA 原文强调的 **λ_RecA / λ_T2A 权衡**一致：重建必须与文本生成混合训练；
+- 发布版 Audio-Omni 很可能已做过 ReCA 式训练（代码含 `SYSTEM_RECONSTRUCT` 与
+  `reconstruct()` 路径），因此小数据量继续训练收益有限。
+
+### 5.6 产物路径
+
+| 类型 | 路径 |
+|---|---|
+| 权重 | `Audio-Omni/model/model_reca_{v3,b3,b4}.ckpt`（各 33 GB） |
+| 训练日志 | `runs/train/reca_{v3,b3,b4}/train_log.jsonl` |
+| 评测结果 | `runs/Benchmark/output/AudioCaps_{v3,b3,b4}/`、`MusicCaps_v3/` |
+| 训练代码 | `src/reca_audio/train/`，说明见 [reca_training.md](reca_training.md) |
+
+## 6. 状态总览
 
 | Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
 |---|---|---|---|---|
@@ -179,8 +261,9 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 | MusicCaps | ✅ 1004 条（T2M） | **CLAP-FAD 0.3140 / KL 1.325 / IS 3.386 / FD 18.55 / CLAP 0.3909** | FAD 1.94 | 同上 |
 | AudioEdit | ⛔ 缺数据 | — | AE_FAD 3.27 | — |
 | TTS | ⛔ 缺数据 | — | WER 1.77 | — |
+| ReCA 后训练 | ⚠️ 已跑 4 轮 | 最佳（v3 600 步）≈ 基线；b3 退化 | — | 自建协议，见第 5 节 |
 
-## 6. 复现命令
+## 7. 复现命令
 
 ```bash
 cd ~/Reca-Audio
@@ -196,7 +279,7 @@ python runs/Benchmark/MMAU/evaluate.py prepare --parquet runs/Benchmark/_data/hf
 bash runs/Benchmark/run_shards.sh --benchmark MMAU
 ```
 
-## 7. UltraEval-Audio（统一评测框架，已接入）
+## 8. UltraEval-Audio（统一评测框架，已接入）
 
 上游：https://github.com/OpenBMB/UltraEval-Audio（ACL 2026 demo），按官方
 `docs/how eval your model.md` 接入。
@@ -268,10 +351,12 @@ python audio_evals/main.py --dataset librispeech-test-clean --model audio-omni
 
 耗时约 70 分钟（2619 条，单进程，双卡组件并行）。
 
-## 8. 下一步
+## 9. 下一步
 
-1. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）；
-2. 给 AudioEdit / TTS 准备 items.jsonl；
-3. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
-4. 在 UltraEval 上补 test-other / dev-clean，形成完整 ASR 基线；
-5. 修 RecA 实验：在同一批 T2A/T2M 数据上对比 base / RecA 后训练。
+1. **ReCA 混合训练**：按 `TASK_MODE=mix LAMBDA_T2A=1` 重跑，验证“重建 + 文本各半”能否在保留
+   T2A 的同时拿到重建收益（代码已支持，未实跑）；
+2. 若混合仍无收益，改为**只训部分参数**（如 cross-attn 投影层）做轻量对齐；
+3. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）；
+4. 给 AudioEdit / TTS 准备 items.jsonl；
+5. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
+6. 在 UltraEval 上补 test-other / dev-clean，形成完整 ASR 基线。

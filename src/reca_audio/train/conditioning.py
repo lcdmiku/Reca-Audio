@@ -79,11 +79,39 @@ def _zero_sync(device: tp.Union[str, torch.device]) -> torch.Tensor:
     return torch.zeros(*EMPTY_SYNC_DIM, dtype=torch.float32, device=device)
 
 
+def _apply_bottleneck(
+    wav: torch.Tensor,
+    downsample: int = 1,
+    seconds: float = 0.0,
+    omni_sr: int = 16000,
+) -> torch.Tensor:
+    """给理解塔制造信息瓶颈（对应 ReCA 原文“输入降分辨率、输出不变”）。
+
+    - downsample>1：先降到 16k/r 再升回 16k，等价于低通滤波（去掉高频细节）
+    - seconds>0 ：随机截取一段更短的音频，让模型只能靠生成先验补全
+    """
+    wav = wav.float()
+    if downsample and downsample > 1:
+        import torchaudio
+
+        low_sr = max(1000, omni_sr // int(downsample))
+        wav = torchaudio.functional.resample(wav, omni_sr, low_sr)
+        wav = torchaudio.functional.resample(wav, low_sr, omni_sr)
+    if seconds and seconds > 0:
+        n = int(omni_sr * seconds)
+        if wav.numel() > n:
+            start = torch.randint(0, wav.numel() - n + 1, (1,)).item()
+            wav = wav[start : start + n]
+    return wav
+
+
 def build_reca_metadata(
     clip,
     device: tp.Union[str, torch.device] = "cuda",
     seconds: float = 10.0,
     sample_rate: int = 44100,
+    omni_downsample: int = 1,
+    omni_seconds: float = 0.0,
 ) -> tp.Dict[str, tp.Any]:
     """ReCA：用**同一段音频**的理解塔表征做条件，重建这段音频。
 
@@ -91,6 +119,7 @@ def build_reca_metadata(
     若把原音频放进去，模型就能“抄”目标，ReCA 就没意义了。
     """
     zeros_wav = torch.zeros(int(sample_rate * MEL_SECONDS), dtype=torch.float32, device=device)
+    cond_wav = _apply_bottleneck(clip.audio_omni, omni_downsample, omni_seconds)
     return {
         "omni_prompt": {
             # Qwen2_5OmniProcessor 不接受纯音频输入，必须带 text。
@@ -99,7 +128,7 @@ def build_reca_metadata(
             # 多样性由 const.py 的 357 条模板提供，任务包装保持不变。
             "text_prompt": build_prompt("Reconstruct", sample_recon_prompt()),
             "video_prompt": None,
-            "audio_prompt": clip.audio_omni.float().cpu().numpy(),
+            "audio_prompt": cond_wav.cpu().numpy(),
         },
         "text_prompt": "",
         "audio_input_prompt": {"audio_input_wav": zeros_wav, "TASK_TTS": False},

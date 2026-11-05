@@ -58,7 +58,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--task-mode", choices=["reca", "t2a", "mix"], default="reca")
     p.add_argument("--lambda-reca", type=float, default=1.0)
     p.add_argument("--lambda-t2a", type=float, default=0.0)
-    p.add_argument("--cfg-dropout", type=float, default=0.1)
+    p.add_argument("--cfg-dropout", type=float, default=0.0,
+                   help="ReCA 的音频条件不参与 CFG，默认不丢弃")
 
     p.add_argument("--device", default="cuda:0")
     p.add_argument("--conditioner-device", default="cuda:1")
@@ -67,6 +68,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--optim", choices=["adamw", "adafactor"], default="adafactor",
                    help="adafactor 只存 factored 状态，比 AdamW 省 ~2/3 优化器显存")
     p.add_argument("--vae-device", default="", help="把冻结的 VAE 放到别的设备（如 cpu）以省显存")
+
+    p.add_argument("--omni-downsample", type=int, default=1,
+                   help="理解塔输入低通倍率（>1 制造信息瓶颈，对应 ReCA 原文降分辨率）")
+    p.add_argument("--omni-seconds", type=float, default=0.0,
+                   help="理解塔只看这么长的随机片段（0=整段），进一步压缩条件信息")
 
     p.add_argument("--save-every", type=int, default=200)
     p.add_argument("--log-every", type=int, default=10)
@@ -101,7 +107,10 @@ def build_metadata(batch: Dict[str, Any], idx: int, mode: str, args, device):
     })()
     if mode == "t2a":
         return build_t2a_metadata(clip, device=device, seconds=args.seconds, sample_rate=args.sample_rate)
-    return build_reca_metadata(clip, device=device, seconds=args.seconds, sample_rate=args.sample_rate)
+    return build_reca_metadata(
+        clip, device=device, seconds=args.seconds, sample_rate=args.sample_rate,
+        omni_downsample=args.omni_downsample, omni_seconds=args.omni_seconds,
+    )
 
 
 def main() -> int:
