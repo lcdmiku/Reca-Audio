@@ -24,6 +24,7 @@ from .loader import load_model_bundle
 from .inference.generation import generate_diffusion_cond
 from .prompts import (
     build_prompt,
+    build_reconstruct_prompt,
     EDITING_ADD, EDITING_REMOVE, EDITING_EXTRACT, EDITING_STYLE,
 )
 
@@ -220,7 +221,7 @@ class AudioOmni:
         否则模型可以直接从 mel 抄声学细节，就不再是"从语义特征重建"了。
         """
         wav16k = self._load_audio_16k_mono(source_audio, max_seconds=seconds_total)
-        qwen_prompt = build_prompt("Reconstruct", template)
+        qwen_prompt = build_reconstruct_prompt(template)
 
         zero_wav = torch.zeros(44100 * seconds_total, dtype=torch.float32, device=self.device)
         conditioning = [{

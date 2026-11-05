@@ -19,7 +19,7 @@ from pathlib import Path
 
 import torch
 
-from audio_omni.prompts import build_prompt
+from audio_omni.prompts import build_prompt, build_reconstruct_prompt
 
 EMPTY_SYNC_DIM = (1, 240, 768)
 
@@ -125,8 +125,8 @@ def build_reca_metadata(
             # Qwen2_5OmniProcessor 不接受纯音频输入，必须带 text；
             # 且文本里必须含 <|AUDIO|> 占位符，否则 processor 只产出 1 个 token，
             # 音频被完全忽略（实测：没有占位符时不同音频得到完全相同条件）。
-            # 占位符放在 user 内容开头，任务包装仍用 build_prompt("Reconstruct", ...)。
-            "text_prompt": build_prompt("Reconstruct", f"<|AUDIO|>{sample_recon_prompt()}"),
+            # build_reconstruct_prompt 负责在 user 内容开头保留且仅保留一个占位符。
+            "text_prompt": build_reconstruct_prompt(sample_recon_prompt()),
             "video_prompt": None,
             "audio_prompt": cond_wav.cpu().numpy(),
         },
