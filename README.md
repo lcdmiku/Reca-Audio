@@ -1,5 +1,32 @@
 # RecA-Audio
 
+## Controlled ReCA/T2A experiment matrix
+
+The guarded matrix launcher uses one SHA-grouped, deterministic 80/10/10
+internal split. Create it once on the server; the command refuses to overwrite
+an existing split directory:
+
+```bash
+python -m reca_audio.train.split_manifest \
+  --manifest runs/Benchmark/_data/audiocaps/train_manifest.jsonl \
+  --out runs/Benchmark/_data/audiocaps/reca_split_v1 \
+  --seed 42
+```
+
+Then smoke-test, launch, and inspect the three trainable arms:
+
+```bash
+ROOT=runs/train/reca_matrix_smoke bash runs/scripts/train_reca_matrix.sh smoke
+ROOT=runs/train/reca_matrix_v1 bash runs/scripts/train_reca_matrix.sh launch
+ROOT=runs/train/reca_matrix_v1 bash runs/scripts/train_reca_matrix.sh status
+```
+
+The launcher assigns Pure ReCA to GPUs 0-1, T2A-only to GPUs 2-3, and the
+1:1 stochastic ReCA/T2A mix to GPUs 4-5. It validates the split report,
+checkpoint, GPU availability, and empty output directories before creating
+anything. The unchanged Audio-Omni checkpoint is the Base arm and is evaluated
+separately; it is not another training process.
+
 把 **Reconstruction Alignment（ReCA, [arXiv:2509.07295](https://arxiv.org/abs/2509.07295)）** 迁移到
 **Audio-Omni**（SIGGRAPH 2026：冻结 Qwen2.5-Omni-3B 理解塔 + 可训练 DiT）的音频生成后训练，
 并搭一套可复现的音频理解 / 生成评测。
