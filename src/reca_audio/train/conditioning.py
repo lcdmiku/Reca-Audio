@@ -70,8 +70,9 @@ def recon_prompts(const_path: str = "") -> tp.List[str]:
     return _PROMPTS
 
 
-def sample_recon_prompt() -> str:
-    return random.choice(recon_prompts())
+def sample_recon_prompt(rng: tp.Optional[random.Random] = None) -> str:
+    chooser = rng if rng is not None else random
+    return chooser.choice(recon_prompts())
 
 
 
@@ -112,6 +113,7 @@ def build_reca_metadata(
     sample_rate: int = 44100,
     omni_downsample: int = 1,
     omni_seconds: float = 0.0,
+    prompt_rng: tp.Optional[random.Random] = None,
 ) -> tp.Dict[str, tp.Any]:
     """ReCA：用**同一段音频**的理解塔表征做条件，重建这段音频。
 
@@ -126,7 +128,7 @@ def build_reca_metadata(
             # 且文本里必须含 <|AUDIO|> 占位符，否则 processor 只产出 1 个 token，
             # 音频被完全忽略（实测：没有占位符时不同音频得到完全相同条件）。
             # build_reconstruct_prompt 负责在 user 内容开头保留且仅保留一个占位符。
-            "text_prompt": build_reconstruct_prompt(sample_recon_prompt()),
+            "text_prompt": build_reconstruct_prompt(sample_recon_prompt(prompt_rng)),
             "video_prompt": None,
             "audio_prompt": cond_wav.cpu().numpy(),
         },
