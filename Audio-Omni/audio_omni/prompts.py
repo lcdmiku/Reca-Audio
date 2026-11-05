@@ -139,3 +139,16 @@ def build_prompt(task: str, text: str = "", **kwargs) -> str:
         return _wrap(SYSTEM_EDITING, user_text)
     else:
         raise ValueError(f"Unknown task: {task!r}")
+
+
+def build_reconstruct_prompt(text: str = "") -> str:
+    """Build a reconstruction prompt with exactly one audio placeholder.
+
+    The reconstruction wrapper owns the ``<|AUDIO|>`` marker. Normalizing
+    accidental leading markers keeps the processor's audio count aligned with
+    the single waveform supplied by both training and inference.
+    """
+    user_text = (text or "").strip()
+    while user_text.startswith("<|AUDIO|>"):
+        user_text = user_text[len("<|AUDIO|>") :].lstrip()
+    return build_prompt("Reconstruct", user_text)
