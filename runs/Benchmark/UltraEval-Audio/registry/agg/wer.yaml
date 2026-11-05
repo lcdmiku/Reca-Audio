@@ -1,4 +1,0 @@
-long-tts-wer:
-  class: audio_evals.agg.sp.WeightedAverage
-  args:
-    weight_col: word_count

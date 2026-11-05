@@ -183,12 +183,19 @@ INPUT=.../prompts1000.jsonl REF=.../musiccaps/ref OUT=.../MusicCaps_full \
 python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref .../musiccaps/ref --panns
 ```
 
-## 4. 编辑类（AudioEdit）与 TTS（Seed-TTS en）
+## 4. 编辑类与 TTS（已移除）
 
-- 代码就绪，**缺数据**；TTS 的 WER 还需 Whisper（当前默认 small，论文用 large 级）。
-- 论文参考：AE_FAD 3.27 / AE_LSD 2.27 / CLAP 0.32；TTS_WER 1.77。
+评测代码与占位脚本已删除：缺 items.jsonl / 参考音频，无法产出指标。
+论文参考值：AE_FAD 3.27 / AE_LSD 2.27 / CLAP 0.32；TTS_WER 1.77。
 
 ## 5. ReCA 后训练实验
+
+> ⚠️ **2026-11-05 更新：本节 5.2–5.5 记录的 v3 / b2 / b3 / b4 全部作废。**
+> 复查发现 Reconstruct prompt 缺少 `<|AUDIO|>` 占位符，processor 只产出 1 个文本 token，
+> 理解塔**从未看到音频**——不同音频得到的条件特征余弦相似度恒为 1.0000。
+> 这些轮次实际训练的是“无音频条件”的模型，loss 平台与 T2A 退化都由该 bug 解释。
+> 修复（`<|AUDIO|>` + 去掉 `p.sum()>0` 过滤）后按 5.6 重训 b6。
+> 以下数据保留仅作过程记录。
 
 ### 5.1 方法
 
@@ -203,12 +210,13 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 
 ### 5.2 训练轮次
 
-| 代号 | 步数 | lr | 精度 | 瓶颈 | 优化器 | 末段 loss |
-|---|---|---|---|---|---|---|
-| v3 | 600 | 1e-5 | fp16 | 无 | Adafactor | 1.066 |
-| b2 | 300 | 2e-5 | fp32 | 低通 2× + 3 s | Adafactor | ~1.00 |
-| b3 | 3000 | 2e-5 | fp32 | 低通 2× + 3 s | Adafactor | 1.061 |
-| b4 | 2000 | 2e-5 | fp32 | 低通 4× + 1.5 s | Adafactor | 1.059 |
+| 代号 | 步数 | lr | 精度 | 瓶颈 | 优化器 | 末段 loss | 状态 |
+|---|---|---|---|---|---|---|---|
+| v3 | 600 | 1e-5 | fp16 | 无 | Adafactor | 1.066 | ❌ 作废 |
+| b2 | 300 | 2e-5 | fp32 | 低通 2× + 3 s | Adafactor | ~1.00 | ❌ 作废 |
+| b3 | 3000 | 2e-5 | fp32 | 低通 2× + 3 s | Adafactor | 1.061 | ❌ 作废 |
+| b4 | 2000 | 2e-5 | fp32 | 低通 4× + 1.5 s | Adafactor | 1.059 | ❌ 作废 |
+| **b6** | 2000 | 2e-5 | fp32 | 低通 4×、整段 5 s | Adafactor | 见 5.6 | ✅ 有效（修复后） |
 
 参考：**预训练模型在同一瓶颈配置下 loss = 1.07 ± 0.04**（8 个种子）。
 所有轮次的 loss 都在 1.0–1.07 附近徘徊，没有实质下降。
@@ -227,48 +235,60 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 | 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLIP ↑ |
 |---|---|---|---|---|---|
 | 基线（原始 ckpt） | 0.2230 | 2.196 | **7.706** | 43.83 | 0.4575 |
-| v3（600 步） | **0.2228** | **2.182** | 7.626 | **43.01** | **0.4613** |
-| b3（3000 步，瓶颈 2×/3 s） | 0.2794 | — | — | — | 0.3606 |
-| b4（2000 步，瓶颈 4×/1.5 s） | 评测中 | — | — | — | — |
+| v3（600 步）❌ 作废 | 0.2228 | 2.182 | 7.626 | 43.01 | 0.4613 |
+| b3（3000 步，瓶颈 2×/3 s）❌ 作废 | 0.2794 | — | — | — | 0.3606 |
+| b4（2000 步，瓶颈 4×/1.5 s）❌ 作废 | 评估中止 | — | — | — | — |
 
 **MusicCaps（1004 条，T2M）**
 
 | 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLIP ↑ |
 |---|---|---|---|---|---|
 | 基线 | 0.3140 | **1.325** | 3.386 | **18.55** | 0.3909 |
-| v3（600 步） | **0.3018** | 1.337 | **3.409** | 18.64 | **0.3923** |
+| v3（600 步）❌ 作废 | 0.3018 | 1.337 | 3.409 | 18.64 | 0.3923 |
 
 ### 5.4 关键发现
 
-1. **两个致命 bug（已修）**
+0. **决定性 bug：音频条件从未生效（2026-11-05 发现）**
+   - `build_prompt("Reconstruct", …)` 的文本里没有 `<|AUDIO|>` 占位符，Qwen processor 只产出
+     1 个 token（带占位符是 251 个，其中 250 个音频 token）；
+   - 结果：不同音频的条件特征余弦相似度 = **1.0000**，修复后 = **0.4196**；
+   - 叠加 `conditioners.py` 用 `p.sum() > 0` 过滤音频（真实波形零均值，实测 **77%** 的 AudioCaps
+     片段和值为负会被丢弃），音频条件彻底失效。
+1. **两个已修的 bug（本轮之前）**
    - 提示词少了 `build_prompt("Reconstruct", …)` 包装 → 理解塔输出 OOD 特征 → 生成白噪声
      （频谱平坦度 0.600 vs 正常 0.032，CLIP −0.048）；
    - flow 方向写反（用了 `x1−ε` 而不是 `ε−x1`）→ loss 在降、采样全是噪声。
      证据：原始模型在两种目标下 loss 分别为 **3.04 / 0.98**。
 2. **fp16 主权重吃掉了权重更新**：每步 |Δw| 仅 1.7e-7，而 fp32 为 6.1e-6（36×）。
-   fp16 在 |w|≈0.5 的可表示间隔是 4.9e-4，lr 1e-5 的更新直接被舍入掉。
 3. **lr 1e-4 过大**：loss 从 1.10 涨到 1.31（高于预训练 1.07），已中止。
-4. **纯 ReCA（λ_T2A=0）会牺牲文本生成能力**：b3 训到 3000 步后
-   AudioCaps FAD 0.2230 → 0.2794（+25%）、CLIP 0.4575 → 0.3606（−21%）。
-5. **加强瓶颈没有改变 loss 平台**：b4 把低通从 2× 加到 4×、条件时长从 3 s 压到 1.5 s，
-   loss 仍是 1.067 → 1.059，说明这批数据上可学余量很小。
+4. 作废轮次里的 T2A 退化（FAD 0.223→0.279、CLIP 0.458→0.361）与 loss 平台，
+   主因都是第 0 条；修复后需重测才能判断纯 ReCA 是否真的损害文本生成。
 
-### 5.5 结论
+### 5.5 结论（修复后重估）
 
-- 在当前数据规模（4411 条 AudioCaps）下，**纯重建对齐学不到超过预训练的东西**，
-  且会把生成头往重建方向拉、损害 T2A；
-- 这与 ReCA 原文强调的 **λ_RecA / λ_T2A 权衡**一致：重建必须与文本生成混合训练；
-- 发布版 Audio-Omni 很可能已做过 ReCA 式训练（代码含 `SYSTEM_RECONSTRUCT` 与
-  `reconstruct()` 路径），因此小数据量继续训练收益有限。
+- 旧的“纯 ReCA 损害 T2A / loss 平台”结论**不成立**：那几轮的条件根本没有音频信息；
+- 修复后 b6 的重建自检：**cfg=1 时平坦度 0.037–0.094**（原始模型 0.032），
+  而 **cfg=7 时退化到 0.125–0.262** —— 重建时开 CFG 会把音频条件一起 null 掉，
+  与 ReCA 的设定冲突，实测印证；
+- b6 的 T2A 评测仍在进行，纯 ReCA 是否损害文本生成能力，待结果判断。
 
-### 5.6 产物路径
+### 5.6 修复后重训（b6）与产物
 
-| 类型 | 路径 |
+配置：2000 步、lr 2e-5、fp32 主权重 + AMP、Adafactor、低通 4× 且**不裁剪**（整段 5 s）。
+
+| 检查项 | 结果 |
 |---|---|
-| 权重 | `Audio-Omni/model/model_reca_{v3,b3,b4}.ckpt`（各 33 GB） |
-| 训练日志 | `runs/train/reca_{v3,b3,b4}/train_log.jsonl` |
-| 评测结果 | `runs/Benchmark/output/AudioCaps_{v3,b3,b4}/`、`MusicCaps_v3/` |
-| 训练代码 | `src/reca_audio/train/`，说明见 [reca_training.md](reca_training.md) |
+| 重建平坦度 cfg=1（seed 0/1/2） | 0.094 / 0.037 / 0.089 |
+| 重建平坦度 cfg=7（对照） | 0.262 / 0.125 / 0.236 |
+| AudioCaps 1000 条（T2A） | 生成中，约 1 小时后出分 |
+
+| 类型 | 路径 | 备注 |
+|---|---|---|
+| 权重 | `Audio-Omni/model/model_reca_b6.ckpt` | 33 GB，merge 后生成 |
+| 训练日志 | `runs/train/reca_b6/train_log.jsonl` | 保留 |
+| 评测结果 | `runs/Benchmark/output/AudioCaps_b6/` | 生成中 |
+| 训练代码 | `src/reca_audio/train/` | 说明见 [reca_training.md](reca_training.md) |
+| 旧轮次产物 | 已删除 | 为省磁盘删除；日志仍在 `runs/train/reca_*/train_log.jsonl` |
 
 ## 6. 状态总览
 
@@ -278,9 +298,7 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 | MMAU | ✅ test-mini 1000 | 57.70 % | 63.30 | 子集 + 提示词不同 |
 | AudioCaps | ✅ 1000 条（T2A） | CLAP-FAD 0.2230 / KL 2.196 / IS 7.706 / FD 43.83 / CLAP 0.4575 | FAD 1.86 | 数据子集 + 嵌入不同，不可比 |
 | MusicCaps | ✅ 1004 条（T2M） | CLAP-FAD 0.3140 / KL 1.325 / IS 3.386 / FD 18.55 / CLAP 0.3909 | FAD 1.94 | 同上 |
-| AudioEdit | ⛔ 缺数据 | — | AE_FAD 3.27 | — |
-| TTS | ⛔ 缺数据 | — | WER 1.77 | — |
-| ReCA 后训练 | ⚠️ 已跑 4 轮 | 最佳（v3 600 步）≈ 基线；b3 退化 | — | 自建协议，见第 5 节 |
+| ReCA 后训练 | ⚠️ 已跑多轮 | 旧轮次受条件 bug 影响作废，b6 评测中 | — | 自建协议，见第 5 节 |
 
 ## 7. 复现命令
 
@@ -298,77 +316,18 @@ python runs/Benchmark/MMAU/evaluate.py prepare --parquet runs/Benchmark/_data/hf
 bash runs/Benchmark/run_shards.sh --benchmark MMAU
 ```
 
-## 8. UltraEval-Audio（统一评测框架，已接入）
+## 8. 已移除的评测组件
 
-上游：https://github.com/OpenBMB/UltraEval-Audio（ACL 2026 demo），按官方
-`docs/how eval your model.md` 接入。
+为精简仓库结构，以下组件已删除（代码、数据与占位文档一并移除）：
 
-### 接入方式
-
-| 文件 | 内容 |
+| 组件 | 移除原因 |
 |---|---|
-| `audio_evals/models/audio_omni.py` | 适配器：prompt 里的 audio → `AudioOmni.understand()` |
-| `registry/model/audio_omni.yaml` | 注册 `--model audio-omni`（模型路径 + 双卡） |
-| `INTEGRATION.md` | 接入说明与补丁记录 |
+| `runs/Benchmark/UltraEval-Audio` | 只覆盖 ASR/TTS，没有 T2A(FAD) 评测；接入后仅跑通 `sample` 冒烟与 LibriSpeech 基线，维护成本高于收益 |
+| `runs/Benchmark/AudioEdit` | 缺 items.jsonl 与参考音频，无法产出指标 |
+| `runs/Benchmark/TTS` | 缺 items.jsonl，且 WER 需要 Whisper large |
 
-仓库用**稀疏检出**（完整 checkout 在 Windows 上因 `lib/Kimi-Audio/...` 路径过深失败），
-只保留框架代码与 registry，未包含各模型私有实现。
-
-### 验证
-
-```bash
-cd runs/Benchmark/UltraEval-Audio
-python audio_evals/main.py --dataset sample --model audio-omni --limit 2
-```
-
-结果：`{'wer(%)': 82.76, 'fail_rate(%)': 0.0}`
-
-- 第 0 条 CER 0%（输出与参考一致）；
-- 第 1 条 CER 184%——模型在答案后追加对话文字，属于提示词遵循问题；
-- 结果文件：`res/audio-omni/sample/<时间>.jsonl`。
-
-### 环境补丁（重要）
-
-| 问题 | 处理 |
-|---|---|
-| 环境是 `datasets==2.14.7`，框架要求 3.6.0 | `huggingface.py` 加 `trust_remote_code` 回退 |
-| `jiwer` 4.x 删了 `compute_measures` | 降到 `jiwer==2.6.0` |
-| `sacrebleu` 2.x 无 `TOKENIZERS` | 降到 `sacrebleu==1.5.1`（`--no-deps`） |
-| `pycocotools` 需编译 | `coco.py` 惰性导入，仅 caption 指标不可用 |
-
-### 已知限制
-
-- 真实数据集需要 `HF_HUB_DOWNLOAD_TIMEOUT` / `HF_HUB_ETAG_TIMEOUT` 调到 300，否则 10 秒超时会误报下载失败；
-- UltraEval 的评分口径与我们 `runs/Benchmark/MMSU` 的官方脚本**不同，不可混用**。
-
-### 基线结果（2026-11-02）
-
-| 数据集 | 指标 | 值 | n | 说明 |
-|---|---|---|---|---|
-| LibriSpeech test-clean | WER | 6.37 % | 2619 | corpus-level，框架汇总 |
-| LibriSpeech test-clean | 逐条 WER 均值 / 中位数 | 11.44 % / 0.00 | 2619 | 长尾拉高均值 |
-| `sample`（冒烟） | CER/WER | 82.76 % | 2 | 样本太少，仅证明链路 |
-
-细节：
-
-- 27 条 WER > 100，主要是模型在转写后追加“如果还有类似音频…”这类对话尾巴；
-- 102 条输出含对话尾巴，中位数为 0 说明大多数转写完全正确；
-- 无空预测，`fail_rate = 0`。
-
-**参考**：Qwen2.5-Omni 在同类报告里 test-clean 约 2.4%。这里 6.37% 的差距主要来自
-输出格式（模型爱加对话尾巴）而不是识别能力——若把尾部裁掉，逐条均值会显著下降。
-后续做 RecA 对比时，**必须保持同一提示词与同一套后处理**，否则数字不可比。
-
-运行命令：
-
-```bash
-cd runs/Benchmark/UltraEval-Audio
-export HF_ENDPOINT=https://hf-mirror.com HF_HUB_DOWNLOAD_TIMEOUT=300 HF_HUB_ETAG_TIMEOUT=300
-export QWEN_OMNI_MODEL_PATH=$(ls -d ~/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots/*/ | head -1)
-python audio_evals/main.py --dataset librispeech-test-clean --model audio-omni
-```
-
-耗时约 70 分钟（2619 条，单进程，双卡组件并行）。
+历史记录：UltraEval 上曾得到 **LibriSpeech test-clean WER 6.37 %（2619 条）**，
+该结果随框架一并作废、不可复现，仅作过程记录保留。
 
 ## 9. 下一步
 
@@ -376,6 +335,5 @@ python audio_evals/main.py --dataset librispeech-test-clean --model audio-omni
    T2A 的同时拿到重建收益（代码已支持，未实跑）；
 2. 若混合仍无收益，改为**只训部分参数**（如 cross-attn 投影层）做轻量对齐；
 3. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）；
-4. 给 AudioEdit / TTS 准备 items.jsonl；
-5. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
-6. 在 UltraEval 上补 test-other / dev-clean，形成完整 ASR 基线。
+4. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
+5. 用 b6（修复 `<|AUDIO|>` 后重训）的结果替换第 5 节中作废的旧轮次。

@@ -1,3 +1,0 @@
-instruct-tts-eval-agg:
-  class: audio_evals.agg.instruct_tts_eval.InstructTTSEvalAgg
-  args: {}

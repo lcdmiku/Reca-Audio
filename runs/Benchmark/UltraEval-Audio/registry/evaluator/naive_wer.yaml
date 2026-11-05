@@ -1,9 +1,0 @@
-naive-wer-zh:
-  class: audio_evals.evaluator.wer.NaiveWER
-  args:
-    lang: zh
-
-naive-wer-en:
-  class: audio_evals.evaluator.wer.NaiveWER
-  args:
-    lang: en

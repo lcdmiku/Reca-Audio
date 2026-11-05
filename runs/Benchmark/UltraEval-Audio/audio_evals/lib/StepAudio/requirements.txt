@@ -1,3 +1,0 @@
-requests>=2.28.0
-librosa
-transformers<5.0.0

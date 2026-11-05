@@ -9,7 +9,7 @@
 #   - 采样   100 步、CFG=6.0（论文设置）
 #   - 输入   优先 <benchmark>/prompts.jsonl（或 items.jsonl），没有则退回 prompts.sample.jsonl
 #   - 输出   runs/Benchmark/output/<benchmark>/
-#   - 收尾   自动 merge；AudioEdit/TTS 自动打分，AudioCaps/MusicCaps 需 REF
+#   - 收尾   自动 merge；AudioCaps/MusicCaps 需 REF 才能打分
 #
 # 覆盖方式（环境变量）：
 #   GPUS_PER_PROC=1 STEPS=30 LIMIT=2 DTYPE=float32 \
@@ -83,8 +83,8 @@ GPU_IDS="${GPU_IDS:-$(seq -s, 0 $((NUM_SHARDS * GPUS_PER_PROC - 1)))}"
 # ---------------------------------------------------------------- 子命令与输入
 case "${BENCH}" in
   MMSU|MMAU) CMD="eval"; INPUT_FLAG="--items"; DEF_INPUT="${BENCH_ROOT}/${BENCH}/items.jsonl" ;;
-  AudioEdit|TTS) CMD="gen"; INPUT_FLAG="--items"; DEF_INPUT="${BENCH_ROOT}/${BENCH}/items.jsonl" ;;
-  *) CMD="gen"; INPUT_FLAG="--prompts"; DEF_INPUT="${BENCH_ROOT}/${BENCH}/prompts.jsonl" ;;
+  AudioCaps|MusicCaps) CMD="gen"; INPUT_FLAG="--prompts"; DEF_INPUT="${BENCH_ROOT}/${BENCH}/prompts.jsonl" ;;
+  *) echo "[fatal] 不支持的 benchmark：${BENCH}（可用：MMSU MMAU AudioCaps MusicCaps）" >&2; exit 2 ;;
 esac
 
 INPUT="${INPUT:-${DEF_INPUT}}"
@@ -154,7 +154,7 @@ echo "[run] shards finished (status=${status})"
 if (( status == 0 )); then
   python "${SCRIPT}" merge --out "${OUT}" || echo "[warn] merge 失败，忽略"
   case "${BENCH}" in
-    AudioEdit|TTS|MMSU|MMAU)
+    MMSU|MMAU)
       python "${SCRIPT}" score --out "${OUT}" || echo "[warn] score 失败"
       ;;
     AudioCaps|MusicCaps)

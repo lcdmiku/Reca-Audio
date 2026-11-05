@@ -33,6 +33,8 @@ Thumbs.db
 # benchmark data / outputs (downloaded, large)
 runs/Benchmark/_data/
 runs/Benchmark/output/
-runs/Benchmark/UltraEval-Audio/res/
-runs/Benchmark/UltraEval-Audio/raw/
-runs/Benchmark/UltraEval-Audio/envs/
+
+# deploy staging artifacts
+deploy_*.tar.gz
+deploy_manifest.sha256
+deploy_files.txt
