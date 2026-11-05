@@ -115,4 +115,3 @@ repository scripts, smoke-tested in each task mode, and only then launched via
 a versioned matrix script.  Each arm writes a PID, launcher log, `args.json`,
 training log, and checkpoints to a distinct output directory.  The launcher
 must refuse to overwrite a non-empty formal output directory.
-

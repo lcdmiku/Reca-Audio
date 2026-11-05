@@ -133,4 +133,3 @@
 - [ ] Run all three smoke modes and a resume check.
 - [ ] Launch Pure on GPUs 0,1; T2A-only on 2,3; Mix-1:1 on 4,5.
 - [ ] Confirm each process is alive, GPU memory is allocated to the intended pair, and at least the first logged losses/task counts are finite.
-
