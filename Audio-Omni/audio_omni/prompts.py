@@ -41,12 +41,13 @@ SYSTEM_EDITING = (
 
 # ---- RecA：用「理解特征」当稠密提示，让模型重建输入本身 ----
 SYSTEM_RECONSTRUCT = (
-    "You are a professional audio engineer. "
-    "Your task is to faithfully reconstruct the input audio, preserving its content, timbre, "
-    "spatial characteristics, and every acoustic detail."
+    "You are an expert in audio understanding. "
+    "Focus on the high-level semantic content of the input audio, "
+    "including sound sources, events, actions, and their temporal relationships. "
+    "Use this understanding to guide audio reconstruction."
 )
 
-RECONSTRUCT_USER = "Reconstruct the input audio faithfully."
+RECONSTRUCT_USER = "Reconstruct the input audio based on its semantic content."
 
 SYSTEM_UNDERSTANDING = (
     "You are Qwen, a virtual human developed by the Qwen Team, Alibaba Group, "
@@ -82,6 +83,17 @@ def _wrap_video(system: str, user: str) -> str:
         "<|im_start|>assistant\n"
     )
 
+def _wrap_audio(system: str, user: str) -> str:
+    """为当前 Audio-Omni conditioner 构造音频输入 prompt。"""
+    user = user.strip()
+    return (
+        f"<|im_start|>system\n{system}<|im_end|>\n"
+        f"<|im_start|>user\n"
+        f"<|AUDIO|>\n{user}"
+        f"<|im_end|>\n"
+        "<|im_start|>assistant\n"
+    )
+
 def build_prompt(task: str, text: str = "", **kwargs) -> str:
     """Build a Qwen-format prompt for the given task.
 
@@ -109,9 +121,8 @@ def build_prompt(task: str, text: str = "", **kwargs) -> str:
     elif task == "V2M":
         return _wrap_video(SYSTEM_V2M, text)
     elif task == "Reconstruct":
-        # RecA：模板只负责"选择重建任务"，信息全部来自音频理解特征
         user_text = (text or "").strip() or RECONSTRUCT_USER
-        return _wrap(SYSTEM_RECONSTRUCT, user_text)
+        return _wrap_audio(SYSTEM_RECONSTRUCT, user_text)
     elif task in ("Add", "Remove", "Extract", "Style Transfer"):
         desc = kwargs.get("desc", text)
         if task == "Add":

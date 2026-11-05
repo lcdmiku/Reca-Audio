@@ -146,7 +146,7 @@ class OmniConditioner(Conditioner):
         self.in_features = in_features
         self.out_features = out_features
         if qwen_omni_model_name == "Qwen/Qwen2.5-Omni-7B":
-            qwen_feature_dim = 2048
+            qwen_feature_dim = 3584
         elif qwen_omni_model_name == "Qwen/Qwen2.5-Omni-3B":
             qwen_feature_dim = 2048
         
@@ -855,22 +855,22 @@ class MultiConditioner(nn.Module):
         output = {}
 
         for key, conditioner in self.conditioners.items():
-            condition_key = key
-
             conditioner_inputs = []
 
             for x in batch_metadata:
+                condition_key = key
 
                 if condition_key not in x:
                     if condition_key in self.default_keys:
                         condition_key = self.default_keys[condition_key]
                     else:
-                        raise ValueError(f"Conditioner key {condition_key} not found in batch metadata")
-
+                        raise ValueError(
+                            f"Conditioner key {condition_key} "
+                            "not found in batch metadata"
+                        )
                 #Unwrap the condition info if it's a single-element list or tuple, this is to support collation functions that wrap everything in a list
-                if isinstance(x[condition_key], list) or isinstance(x[condition_key], tuple) and len(x[condition_key]) == 1:
+                if isinstance(x[condition_key], (list, tuple)) and len(x[condition_key]) == 1:
                     conditioner_input = x[condition_key][0]
-
                 else:
                     conditioner_input = x[condition_key]
 
