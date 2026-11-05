@@ -61,3 +61,6 @@ UTF-8 中文注释被按 ANSI 读写损坏（18296 → 19107 字节），本地/
 4. `DEPLOYED_COMMIT` 目前只是**记录**，不会阻止训练/评测启动；如需强约束，可在启动脚本里
    比对 `git rev-parse` 与 `DEPLOYED_COMMIT`。
 5. 本机 `~/.ssh` 受安全策略保护，脚本不读取其中的配置；`-Push` 依赖系统 `ssh/scp` 的默认配置。
+6. **删除不会自动同步**：`deploy.sh` 只解包 + 校验，不会删除「git 里已删、服务器上仍在」的文件
+   （例如 2026-11-05 移除 UltraEval-Audio 后，需在服务器手工 `rm -rf` 对应目录）。
+   大目录删除后记得重跑一次 `deploy.sh` 或手工更新 `DEPLOYED_COMMIT`。
