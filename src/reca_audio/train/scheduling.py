@@ -19,4 +19,3 @@ def choose_task_mode(
         raise ValueError(f"draw must be in [0, 1), got {draw}")
     p_reca = lambda_reca / (lambda_reca + lambda_t2a)
     return "reca" if draw < p_reca else "t2a"
-
