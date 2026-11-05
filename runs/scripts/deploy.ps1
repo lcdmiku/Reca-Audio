@@ -36,6 +36,17 @@ $scope = @("src", "Audio-Omni/audio_omni", "runs/scripts", "runs/Benchmark")
 $files = git ls-files -- $scope | Where-Object { $_ -and (Test-Path $_) }
 if (-not $files) { Write-Host "[deploy] nothing to sync in scope" -ForegroundColor Red; exit 1 }
 
+# Bash reads the packaged worktree bytes, not Git's normalized blob. Refuse a
+# Windows checkout with CRLF before it can replace a working remote script.
+$badShellFiles = $files | Where-Object {
+    $_.EndsWith(".sh") -and [IO.File]::ReadAllText((Join-Path $Root $_)).Contains("`r")
+}
+if ($badShellFiles) {
+    Write-Host "[deploy] shell scripts must use LF line endings:" -ForegroundColor Red
+    $badShellFiles | ForEach-Object { Write-Host "  $_" }
+    exit 1
+}
+
 # ---------- manifest (input of safeguard 2) ----------
 $manifest = Join-Path $Root "deploy_manifest.sha256"
 $lines = foreach ($f in $files) {
