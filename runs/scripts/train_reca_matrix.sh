@@ -17,9 +17,26 @@ STEPS="${STEPS:-2000}"
 SEED="${SEED:-42}"
 DRY_RUN="${DRY_RUN:-0}"
 SKIP_GPU_CHECK="${SKIP_GPU_CHECK:-0}"
-PYTHON_BIN="${PYTHON_BIN:-python}"
+CONDA_ENV="${CONDA_ENV:-audio-omni}"
 
 ARMS=(pure t2a mix)
+
+resolve_python() {
+  if [[ -n "${PYTHON_BIN:-}" ]]; then
+    return 0
+  fi
+  if command -v python >/dev/null 2>&1; then
+    PYTHON_BIN=python
+    return 0
+  fi
+  local conda_python="${HOME}/miniconda3/envs/${CONDA_ENV}/bin/python"
+  if [[ -x "${conda_python}" ]]; then
+    PYTHON_BIN="${conda_python}"
+    return 0
+  fi
+  echo "python is unavailable; activate ${CONDA_ENV} or set PYTHON_BIN" >&2
+  return 1
+}
 
 usage() {
   echo "usage: bash runs/scripts/train_reca_matrix.sh {smoke|launch|status}"
@@ -52,6 +69,7 @@ status() {
 }
 
 validate_split() {
+  resolve_python
   [[ -f "${SPLIT_DIR}/train_manifest.jsonl" ]] || {
     echo "missing split manifest: ${SPLIT_DIR}/train_manifest.jsonl" >&2
     return 1
@@ -179,7 +197,7 @@ launch() {
   fi
 
   source "${CONDA_SH:-${HOME}/miniconda3/etc/profile.d/conda.sh}"
-  conda activate "${CONDA_ENV:-audio-omni}"
+  conda activate "${CONDA_ENV}"
   export QWEN_OMNI_MODEL_PATH="${QWEN_OMNI_MODEL_PATH:-$(find "${HOME}/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots" -mindepth 1 -maxdepth 1 -type d -print -quit)}"
   [[ -n "${QWEN_OMNI_MODEL_PATH}" ]] && [[ -d "${QWEN_OMNI_MODEL_PATH}" ]] || {
     echo "Qwen snapshot is unavailable; set QWEN_OMNI_MODEL_PATH" >&2

@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -90,6 +91,25 @@ class MatrixLauncherTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("refusing non-empty output", result.stdout)
             self.assertEqual((pure / "keep.txt").read_text(encoding="utf-8"), "keep")
+
+    def test_dry_run_falls_back_to_conda_python_outside_an_activated_shell(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            env = self._valid_inputs(root)
+            fake_python = root / "home" / "miniconda3" / "envs" / "audio-omni" / "bin" / "python"
+            fake_python.parent.mkdir(parents=True)
+            executable = Path(sys.executable).as_posix()
+            fake_python.write_text(
+                f'#!/bin/sh\nexec "{executable}" "$@"\n', encoding="utf-8", newline="\n"
+            )
+            fake_python.chmod(0o755)
+            env.update({"HOME": str(root / "home"), "PATH": "/usr/bin"})
+
+            result = _run("launch", env)
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("split validation: disjoint by id and sha256", result.stdout)
+            self.assertIn("dry-run: validation passed", result.stdout)
 
 
 if __name__ == "__main__":
