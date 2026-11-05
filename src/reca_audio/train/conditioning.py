@@ -122,11 +122,11 @@ def build_reca_metadata(
     cond_wav = _apply_bottleneck(clip.audio_omni, omni_downsample, omni_seconds)
     return {
         "omni_prompt": {
-            # Qwen2_5OmniProcessor 不接受纯音频输入，必须带 text。
-            # 关键：Audio-Omni 预训练用的是 build_prompt("Reconstruct", ...) 的系统模板；
-            # 裸文本会让理解塔输出 OOD 特征，DiT 会直接学崩（实测输出白噪声）。
-            # 多样性由 const.py 的 357 条模板提供，任务包装保持不变。
-            "text_prompt": build_prompt("Reconstruct", sample_recon_prompt()),
+            # Qwen2_5OmniProcessor 不接受纯音频输入，必须带 text；
+            # 且文本里必须含 <|AUDIO|> 占位符，否则 processor 只产出 1 个 token，
+            # 音频被完全忽略（实测：没有占位符时不同音频得到完全相同条件）。
+            # 占位符放在 user 内容开头，任务包装仍用 build_prompt("Reconstruct", ...)。
+            "text_prompt": build_prompt("Reconstruct", f"<|AUDIO|>{sample_recon_prompt()}"),
             "video_prompt": None,
             "audio_prompt": cond_wav.cpu().numpy(),
         },

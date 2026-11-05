@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import torch
 import typing as tp
 
@@ -185,7 +186,17 @@ class OmniConditioner(Conditioner):
                         # Keep other types (e.g., numpy array) as well
                         video_prompts_filtered.append(p)
             video_prompts = video_prompts_filtered if video_prompts_filtered else None
-            audio_prompts = [p for p in audio_prompts if p is not None and p.sum() > 0] or None
+            # 修复上游 bug：原实现用 p.sum() > 0 过滤音频，但真实波形有正有负，
+            # 实测 77% 的 AudioCaps 片段和值为负 -> 音频条件被静默丢弃。
+            # 改为按“是否为空 / 是否全静音”判断。
+            def _has_signal(p) -> bool:
+                if p is None:
+                    return False
+                arr = p.detach().cpu().numpy() if isinstance(p, torch.Tensor) else p
+                arr = np.asarray(arr)
+                return arr.size > 0 and float(np.max(np.abs(arr))) > 1e-8
+
+            audio_prompts = [p for p in audio_prompts if _has_signal(p)] or None
             
             inputs = self.processor(text=text_prompts, audio=audio_prompts, images=None, videos=video_prompts,  return_tensors="pt", padding=True, use_audio_in_video=False)
             qwen_mask = inputs.get("attention_mask", None)

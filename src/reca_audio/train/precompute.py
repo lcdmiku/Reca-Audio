@@ -29,6 +29,8 @@ def main() -> int:
     ap.add_argument("--model-config", default="Audio-Omni/model/Audio-Omni.json")
     ap.add_argument("--ckpt", default="Audio-Omni/model/model.ckpt")
     ap.add_argument("--seconds", type=float, default=11.0)
+    ap.add_argument("--omni-downsample", type=int, default=1, help="理解塔输入低通倍率")
+    ap.add_argument("--omni-seconds", type=float, default=0.0, help="理解塔只取这么长的随机片段（0=整段）")
     ap.add_argument("--shard-index", type=int, default=0)
     ap.add_argument("--num-shards", type=int, default=1)
     ap.add_argument("--device", default="cuda:0")
@@ -63,7 +65,10 @@ def main() -> int:
         audio = clip.audio.unsqueeze(0).to(device)
         with torch.no_grad():
             latent = model.pretransform.encode(audio).half().cpu()[0]
-            meta = build_reca_metadata(clip, device=device, seconds=args.seconds, sample_rate=sample_rate)
+            meta = build_reca_metadata(
+                clip, device=device, seconds=args.seconds, sample_rate=sample_rate,
+                omni_downsample=args.omni_downsample, omni_seconds=args.omni_seconds,
+            )
             cond = model.conditioner([meta], device)
             cond_inputs = model.get_conditioning_inputs(cond)
             c = cond_inputs["cross_attn_cond"][0].half().cpu()

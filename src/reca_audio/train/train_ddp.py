@@ -80,6 +80,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--cfg-dropout", type=float, default=0.1)
 
     p.add_argument("--seconds", type=float, default=5.0, help="训练片段长度；5 s 可稳住在 32 GB")
+    p.add_argument("--omni-downsample", type=int, default=1, help="理解塔输入低通倍率")
+    p.add_argument("--omni-seconds", type=float, default=0.0, help="理解塔只取这么长的随机片段（0=整段）")
     p.add_argument("--gpus-per-rank", type=int, default=2)
     p.add_argument("--amp", action="store_true")
     p.add_argument("--dtype", choices=["float32", "float16"], default="float32",
@@ -253,6 +255,7 @@ def main() -> int:
                         build_reca_metadata(
                             type("C", (), {"audio_omni": batch["audio_omni"][i], "caption": batch["caption"][i]})(),
                             device=aux_device, seconds=args.seconds, sample_rate=sample_rate,
+                            omni_downsample=args.omni_downsample, omni_seconds=args.omni_seconds,
                         )
                         for i in range(len(batch["caption"]))
                     ]

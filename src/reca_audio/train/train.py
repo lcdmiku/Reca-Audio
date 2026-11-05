@@ -172,7 +172,9 @@ def main() -> int:
         optim = torch.optim.AdamW(
             params, lr=args.lr, betas=(0.9, 0.95), weight_decay=args.weight_decay,
         )
-    scaler = torch.amp.GradScaler("cuda", enabled=args.amp)
+    # fp16 参数会产生 fp16 梯度，GradScaler 无法 unscale；只在 fp32 主权重时启用
+    use_scaler = args.amp and args.dtype == "float32"
+    scaler = torch.amp.GradScaler("cuda", enabled=use_scaler)
 
     start_step = 0
     if args.resume and Path(args.resume).exists():
@@ -221,13 +223,17 @@ def main() -> int:
             audio = batch["audio"].to(device, non_blocking=True)
             with torch.no_grad():
                 latents = model.pretransform.encode(audio.to(vae_device)).detach().to(device)
-                # 条件按样本构造（conditioner 一次吃 list[dict]）
-                metas = []
-                for i in range(len(batch["caption"])):
-                    mode = args.task_mode
-                    if mode == "mix":
-                        mode = "reca" if torch.rand(1).item() < args.lambda_reca / max(1e-9, args.lambda_reca + args.lambda_t2a) else "t2a"
-                    metas.append(build_metadata(batch, i, mode, args, device))
+                # 混合训练按 batch 统一选任务，避免同一 batch 里 ReCA/T2A 混排
+                # （conditioner 会各自过滤 None 音频，混排可能破坏 batch 对齐）
+                batch_mode = args.task_mode
+                if batch_mode == "mix":
+                    p_reca = args.lambda_reca / max(1e-9, args.lambda_reca + args.lambda_t2a)
+                    batch_mode = "reca" if torch.rand(1).item() < p_reca else "t2a"
+                # 条件在 conditioner 所在卡上构造
+                metas = [
+                    build_metadata(batch, i, batch_mode, args, cond_device)
+                    for i in range(len(batch["caption"]))
+                ]
                 cond_tensors = model.conditioner(metas, cond_device)
                 cond_tensors = move_cond(cond_tensors, device)
                 cond_inputs = model.get_conditioning_inputs(cond_tensors)

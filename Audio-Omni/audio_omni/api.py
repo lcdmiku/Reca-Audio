@@ -220,7 +220,10 @@ class AudioOmni:
         否则模型可以直接从 mel 抄声学细节，就不再是"从语义特征重建"了。
         """
         wav16k = self._load_audio_16k_mono(source_audio, max_seconds=seconds_total)
-        qwen_prompt = build_prompt("Reconstruct", template)
+        # 关键：文本里必须带 <|AUDIO|> 占位符，否则 processor 只产出 1 个 token，
+        # 理解塔看不到音频（与 _wrap_video 的 <|VIDEO|> 同理）。
+        _instr = (template.strip() or "Reconstruct the input audio faithfully.")
+        qwen_prompt = build_prompt("Reconstruct", f"<|AUDIO|>{_instr}")
 
         zero_wav = torch.zeros(44100 * seconds_total, dtype=torch.float32, device=self.device)
         conditioning = [{
