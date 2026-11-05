@@ -234,10 +234,14 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 
 | 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLIP ↑ |
 |---|---|---|---|---|---|
-| 基线（原始 ckpt） | 0.2230 | 2.196 | **7.706** | 43.83 | 0.4575 |
+| 基线（原始 ckpt） | **0.2230** | 2.196 | **7.706** | **43.83** | **0.4575** |
+| **b6（2000 步，修复后）** | 0.2533 | **2.002** | 6.215 | 44.51 | 0.4166 |
 | v3（600 步）❌ 作废 | 0.2228 | 2.182 | 7.626 | 43.01 | 0.4613 |
 | b3（3000 步，瓶颈 2×/3 s）❌ 作废 | 0.2794 | — | — | — | 0.3606 |
 | b4（2000 步，瓶颈 4×/1.5 s）❌ 作废 | 评估中止 | — | — | — | — |
+
+**b6 vs 基线**：CLAP-FAD 0.2230 → **0.2533（变差 0.030）**，CLIP 0.4575 → **0.4166（变差 0.041）**，
+IS 7.71 → 6.21（变差），KL 2.196 → **2.002（变好）**，FD 43.83 → 44.51（基本持平）。
 
 **MusicCaps（1004 条，T2M）**
 
@@ -270,7 +274,9 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 - 修复后 b6 的重建自检：**cfg=1 时平坦度 0.037–0.094**（原始模型 0.032），
   而 **cfg=7 时退化到 0.125–0.262** —— 重建时开 CFG 会把音频条件一起 null 掉，
   与 ReCA 的设定冲突，实测印证；
-- b6 的 T2A 评测仍在进行，纯 ReCA 是否损害文本生成能力，待结果判断。
+- b6（修复后 2000 步）的 T2A 结果：**CLAP-FAD 0.2230 → 0.2533、CLIP 0.4575 → 0.4166、IS 7.71 → 6.21**
+  都变差，只有 **KL 2.196 → 2.002** 变好。说明纯重建对齐（λ_T2A=0）确实把生成头往重建方向拉，
+  牺牲了文本-音频对齐与多样性——与 ReCA 原文强调的混合训练（λ_RecA / λ_T2A 权衡）一致。
 
 ### 5.6 修复后重训（b6）与产物
 
@@ -280,13 +286,13 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 |---|---|
 | 重建平坦度 cfg=1（seed 0/1/2） | 0.094 / 0.037 / 0.089 |
 | 重建平坦度 cfg=7（对照） | 0.262 / 0.125 / 0.236 |
-| AudioCaps 1000 条（T2A） | 生成中，约 1 小时后出分 |
+| AudioCaps 1000 条（T2A） | CLAP-FAD 0.2533 / KL 2.002 / IS 6.215 / FD 44.51 / CLIP 0.4166 |
 
 | 类型 | 路径 | 备注 |
 |---|---|---|
-| 权重 | `Audio-Omni/model/model_reca_b6.ckpt` | 33 GB，merge 后生成 |
+| 权重 | `Audio-Omni/model/model_reca_b6.ckpt` | 33 GB |
 | 训练日志 | `runs/train/reca_b6/train_log.jsonl` | 保留 |
-| 评测结果 | `runs/Benchmark/output/AudioCaps_b6/` | 生成中 |
+| 评测结果 | `runs/Benchmark/output/AudioCaps_b6/` | 已完成 |
 | 训练代码 | `src/reca_audio/train/` | 说明见 [reca_training.md](reca_training.md) |
 | 旧轮次产物 | 已删除 | 为省磁盘删除；日志仍在 `runs/train/reca_*/train_log.jsonl` |
 
@@ -298,7 +304,7 @@ python runs/Benchmark/MusicCaps/evaluate.py score --out .../MusicCaps_full --ref
 | MMAU | ✅ test-mini 1000 | 57.70 % | 63.30 | 子集 + 提示词不同 |
 | AudioCaps | ✅ 1000 条（T2A） | CLAP-FAD 0.2230 / KL 2.196 / IS 7.706 / FD 43.83 / CLAP 0.4575 | FAD 1.86 | 数据子集 + 嵌入不同，不可比 |
 | MusicCaps | ✅ 1004 条（T2M） | CLAP-FAD 0.3140 / KL 1.325 / IS 3.386 / FD 18.55 / CLAP 0.3909 | FAD 1.94 | 同上 |
-| ReCA 后训练 | ⚠️ 已跑多轮 | 旧轮次受条件 bug 影响作废，b6 评测中 | — | 自建协议，见第 5 节 |
+| ReCA 后训练 | ⚠️ 修复 bug 后重训 b6 | b6：CLAP-FAD 0.2533 / KL 2.002 / IS 6.215 / FD 44.51 / CLIP 0.4166（基线 0.2230 / 2.196 / 7.706 / 43.83 / 0.4575，除 KL 外均变差） | — | 自建协议，见第 5 节 |
 
 ## 7. 复现命令
 
@@ -331,8 +337,8 @@ bash runs/Benchmark/run_shards.sh --benchmark MMAU
 
 ## 9. 下一步
 
-1. **ReCA 混合训练**：按 `TASK_MODE=mix LAMBDA_T2A=1` 重跑，验证“重建 + 文本各半”能否在保留
-   T2A 的同时拿到重建收益（代码已支持，未实跑）；
+1. **ReCA 混合训练**：b6 已验证纯重建（λ_T2A=0）会让 T2A 变差（FAD +0.030、CLIP −0.041），
+   下一步按 `TASK_MODE=mix LAMBDA_T2A=1` 重跑，验证“重建 + 文本各半”能否兼顾（代码已支持，未实跑）；
 2. 若混合仍无收益，改为**只训部分参数**（如 cross-attn 投影层）做轻量对齐；
 3. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）；
 4. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；

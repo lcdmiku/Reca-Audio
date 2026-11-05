@@ -15,7 +15,7 @@
 | Audio-Omni 推理（T2A / T2M / 编辑 / 理解） | ✅ 双卡组件并行，V100 可跑 | `Audio-Omni/` |
 | 理解评测 MMSU / MMAU | ✅ 全量跑完：**59.70 % / 57.70 %** | `runs/Benchmark/{MMSU,MMAU}` |
 | 生成评测 AudioCaps / MusicCaps | ✅ 基线：CLAP-FAD **0.2230 / 0.3140** | `runs/Benchmark/{AudioCaps,MusicCaps}` |
-| ReCA 后训练 | 🔄 修复关键 bug 后重训 b6，评测进行中 | `src/reca_audio/train/` |
+| ReCA 后训练 | ⚠️ b6 已完成：CLAP-FAD **0.2533** / CLIP **0.4166**（基线 0.2230 / 0.4575）——纯 ReCA 弱于基线，下一步混合训练 | `src/reca_audio/train/` |
 | VGGish-FAD | ⛔ 缺权重（只有 GitHub 渠道） | — |
 
 全部数字与协议说明见 **[docs/result.md](docs/result.md)**。
