@@ -402,6 +402,62 @@ layer 6（0.563），后层 layer 30--35 大约为 0.91--0.94。ReCA/T2A 的归�
 - 静态诊断：`runs/train/reca_gradient_static_02cf985/static/metrics.jsonl`
 - 两处均无模型权重；完成后 `/home/linchudeng` 仍约 350G。
 
+### 5.9 Equal-exposure A/B：accumulation 1 vs 4（2026-11-07）
+
+正式小规模实验消费同一份 400-record schedule（SHA256
+`daf5abc2...119298`），实际任务数为 ReCA 211 / T2A 189。A 使用 accumulation 1、
+执行 400 次 optimizer update；B 使用 accumulation 4、执行 100 次 update。因此这是
+**相同数据预算下不同优化制度**的比较，不是相同 update 数的比较。
+
+合同和产物检查均通过：固定诊断位于 exposure 0/100/200/400；checkpoint 对应 A 的
+step 100/200/400 和 B 的 step 25/50/100，均成功 reload。中间 checkpoint 已删除，只保留
+exposure 400 最终权重。
+
+**训练更新稳定性**
+
+| Arm | update 数 | pre-clip norm 均值 | norm variance | norm CV | clipping rate | 平均 clip scale |
+|---|---:|---:|---:|---:|---:|---:|
+| A / accum 1 | 400 | 2.1728 | 0.7526 | 0.3993 | 99.75% | 0.5145 |
+| B / accum 4 | 100 | **1.1859** | **0.1122** | **0.2825** | **66.0%** | **0.8596** |
+
+B 的 update-norm variance 比 A 低约 85%，CV 低约 29%，并把裁剪率从 99.75% 降到
+66%。因此 accumulation 4 明显减少了实际 optimizer update 的幅度波动和 clipping
+饱和；这支持增大 effective batch 用于后续训练稳定性，但其中也包含“四个梯度先平均”
+这一机制本身，不能解释为数据分布噪声消失。
+
+**固定 held-out 诊断（8 条）**
+
+| Exposure | Arm | ReCA loss | T2A loss | ReCA variance | T2A variance | R/T cosine | global drift |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 0 | A/B | 1.01485 | 1.00109 | 13.483 | 17.496 | 0.7465 | 0 |
+| 100 | A | 1.00364 | 0.99949 | 8.139 | 7.743 | 0.8348 | 0.013512 |
+| 100 | B | **0.98170** | **0.98215** | 9.972 | 9.138 | 0.8218 | **0.007478** |
+| 200 | A | 1.00729 | 1.01051 | 5.752 | 8.781 | 0.8883 | 0.017012 |
+| 200 | B | **0.98775** | **0.98648** | **4.674** | **5.237** | 0.8704 | **0.009453** |
+| 400 | A | 0.98321 | 0.98402 | 4.407 | 4.555 | **0.8963** | 0.017635 |
+| 400 | B | **0.97995** | **0.97956** | **4.297** | **4.471** | 0.8897 | **0.009804** |
+
+两臂的绝对固定批次 variance 都随梯度整体变小而下降；但以 mean-gradient norm²
+归一化后，最终 ReCA/T2A variance 分别为 A 的 6.64/6.89、B 的 7.00/6.92，B 并没有
+降低相对样本梯度方差。因此需要区分：**B 明显稳定了四样本平均后的 update，但没有证据
+表明单样本梯度分布本身变得更一致。**
+
+ReCA/T2A cosine 全程为正，且 A/B 都从 0.7465 上升到约 0.89，不支持“两个任务发生
+全局反向梯度冲突”。冲突/差异主要集中在早中层；最终最低仍是 layer 5（A 0.661、
+B 0.610）以及 layer 2--6。参数漂移最大则集中在 layer 30--35，其次是 layer 0--2。
+
+B 最终 global drift 为 0.009804，比 A 的 0.017635 低约 44%。同时 B 的固定 T2A flow
+loss 不劣于 A，但该 loss 不是 T2A 生成指标；在对两个最终 checkpoint 运行相同 T2A
+生成 benchmark 前，不能推出 B 保留了更多文本生成能力，也不能建立 drift 与 AudioCaps
+指标下降之间的相关性。
+
+产物：
+
+- `runs/train/reca_gradient_ab_v1/a/dit_exposure0400.pt`（约 12.16 GB）
+- `runs/train/reca_gradient_ab_v1/b/dit_exposure0400.pt`（约 12.16 GB）
+- `runs/train/reca_gradient_ab_v1/{a,b}/metrics.jsonl`
+- 完成后 `/home/linchudeng` 约 373G，GPU 与实验进程均已释放。
+
 ## 6. 状态总览
 
 | Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
