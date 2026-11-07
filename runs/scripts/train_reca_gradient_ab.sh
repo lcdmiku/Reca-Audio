@@ -13,6 +13,25 @@ SCHEDULE="${OUT_ROOT}/schedule.jsonl"
 GPUS="${GPUS:-0,1}"
 CKPT="${CKPT:-Audio-Omni/model/model.ckpt}"
 
+validate_gpus() {
+  local gpu used threshold="${GPU_MEMORY_LIMIT_MIB:-128}"
+  command -v nvidia-smi >/dev/null || {
+    echo "nvidia-smi is unavailable" >&2
+    return 1
+  }
+  for gpu in ${GPUS//,/ }; do
+    used="$(nvidia-smi -i "${gpu}" --query-gpu=memory.used --format=csv,noheader,nounits | tr -d '[:space:]')"
+    if [[ ! "${used}" =~ ^[0-9]+$ ]]; then
+      echo "cannot read GPU ${gpu} memory usage: ${used}" >&2
+      return 1
+    fi
+    if (( used > threshold )); then
+      echo "GPU ${gpu} is not free: ${used} MiB used (limit ${threshold} MiB)" >&2
+      return 1
+    fi
+  done
+}
+
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate "${CONDA_ENV:-audio-omni}"
 export PYTHONPATH="${ROOT_DIR}/src:${ROOT_DIR}/Audio-Omni:${PYTHONPATH:-}"
@@ -57,6 +76,8 @@ case "${ACTION}" in
     exit 2
     ;;
 esac
+
+validate_gpus
 
 if [[ -e "${OUT_ROOT}" ]]; then
   echo "refusing existing output root: ${OUT_ROOT}" >&2

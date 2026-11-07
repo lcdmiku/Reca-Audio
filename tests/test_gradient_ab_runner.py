@@ -88,6 +88,8 @@ def test_prepare_only_is_not_mistaken_for_formal_training():
 def test_launcher_guards_formal_run_and_reuses_one_schedule():
     text = LAUNCHER.read_text(encoding="utf-8")
     assert 'ALLOW_FORMAL' in text
+    assert 'validate_gpus' in text
+    assert '--query-gpu=memory.used' in text
     assert 'schedule.jsonl' in text
     assert '--arm a' in text
     assert '--arm b' in text
