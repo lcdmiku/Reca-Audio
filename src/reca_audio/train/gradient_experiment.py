@@ -6,7 +6,9 @@ import json
 import math
 import random
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
+
+import torch
 
 
 def exposure_lr(
@@ -102,3 +104,140 @@ def load_schedule(path: str | Path, expected_digest: str | None = None) -> list[
     if expected_digest is not None and digest != expected_digest:
         raise ValueError(f"schedule digest mismatch: expected {expected_digest}, got {digest}")
     return [json.loads(line) for line in payload.decode("utf-8").splitlines() if line]
+
+
+def block_name(parameter_name: str) -> str:
+    parts = parameter_name.split(".")
+    for marker in ("transformer_blocks", "blocks", "layers"):
+        if marker in parts:
+            index = parts.index(marker)
+            if index + 1 < len(parts) and parts[index + 1].isdigit():
+                return ".".join(parts[: index + 2])
+    return parts[0]
+
+
+def _tensor_items(
+    tensors: Mapping[str, torch.Tensor | None],
+) -> Iterable[tuple[str, torch.Tensor]]:
+    for name, tensor in tensors.items():
+        if tensor is not None:
+            yield name, tensor
+
+
+def gradient_cosine(
+    left: Mapping[str, torch.Tensor | None],
+    right: Mapping[str, torch.Tensor | None],
+) -> float | None:
+    if left.keys() != right.keys():
+        raise ValueError("gradient mappings must have identical parameter names")
+    dot = left_sq = right_sq = 0.0
+    for name, left_tensor in _tensor_items(left):
+        right_tensor = right[name]
+        if right_tensor is None:
+            raise ValueError(f"gradient presence differs for {name}")
+        lhs = left_tensor.detach().to(dtype=torch.float64)
+        rhs = right_tensor.detach().to(device=lhs.device, dtype=torch.float64)
+        dot += torch.sum(lhs * rhs).item()
+        left_sq += torch.sum(lhs.square()).item()
+        right_sq += torch.sum(rhs.square()).item()
+    if left_sq == 0.0 or right_sq == 0.0:
+        return None
+    return dot / math.sqrt(left_sq * right_sq)
+
+
+def block_gradient_norms(
+    gradients: Mapping[str, torch.Tensor | None],
+) -> dict[str, float]:
+    squares: dict[str, float] = {}
+    for name, tensor in _tensor_items(gradients):
+        key = block_name(name)
+        squares[key] = squares.get(key, 0.0) + torch.sum(
+            tensor.detach().to(dtype=torch.float64).square()
+        ).item()
+    return {key: math.sqrt(value) for key, value in squares.items()}
+
+
+class GradientMoments:
+    """Exact vector moments while retaining only one running gradient sum."""
+
+    def __init__(self) -> None:
+        self.count = 0
+        self._sum: dict[str, torch.Tensor] = {}
+        self._sum_sample_sq_norm = 0.0
+        self._sum_sample_norm = 0.0
+
+    def add(self, gradients: Mapping[str, torch.Tensor | None]) -> None:
+        sample_sq = 0.0
+        present = dict(_tensor_items(gradients))
+        if self.count and self._sum.keys() != present.keys():
+            raise ValueError("all gradient samples must have identical parameter names")
+        for name, tensor in present.items():
+            detached = tensor.detach().to(device="cpu", dtype=torch.float32)
+            sample_sq += torch.sum(detached.to(torch.float64).square()).item()
+            if name not in self._sum:
+                self._sum[name] = detached.clone()
+            else:
+                self._sum[name].add_(detached)
+        self.count += 1
+        self._sum_sample_sq_norm += sample_sq
+        self._sum_sample_norm += math.sqrt(sample_sq)
+
+    def summary(self) -> dict[str, float | int]:
+        if not self.count:
+            raise ValueError("no gradient samples were added")
+        mean_sq = sum(
+            torch.sum((value.to(torch.float64) / self.count).square()).item()
+            for value in self._sum.values()
+        )
+        variance = max(0.0, self._sum_sample_sq_norm / self.count - mean_sq)
+        return {
+            "count": self.count,
+            "mean_gradient_norm": math.sqrt(mean_sq),
+            "mean_sample_norm": self._sum_sample_norm / self.count,
+            "gradient_variance": variance,
+        }
+
+
+def clipping_metrics(pre_clip_norm: float, threshold: float) -> dict[str, float]:
+    if pre_clip_norm < 0 or threshold <= 0:
+        raise ValueError("norm must be non-negative and threshold must be positive")
+    scale = min(1.0, threshold / max(pre_clip_norm, 1e-30))
+    return {
+        "pre_clip_norm": pre_clip_norm,
+        "post_clip_norm": pre_clip_norm * scale,
+        "clip_scale": scale,
+        "clipped": float(pre_clip_norm > threshold),
+    }
+
+
+def parameter_drift(
+    baseline: Mapping[str, torch.Tensor],
+    current: Mapping[str, torch.Tensor],
+) -> dict[str, Any]:
+    if baseline.keys() != current.keys():
+        raise ValueError("baseline and current parameters must have identical names")
+    global_delta_sq = global_base_sq = 0.0
+    block_delta_sq: dict[str, float] = {}
+    block_base_sq: dict[str, float] = {}
+    for name, base in baseline.items():
+        now = current[name]
+        base64 = base.detach().to(device="cpu", dtype=torch.float64)
+        now64 = now.detach().to(device="cpu", dtype=torch.float64)
+        delta_sq = torch.sum((now64 - base64).square()).item()
+        base_sq = torch.sum(base64.square()).item()
+        global_delta_sq += delta_sq
+        global_base_sq += base_sq
+        key = block_name(name)
+        block_delta_sq[key] = block_delta_sq.get(key, 0.0) + delta_sq
+        block_base_sq[key] = block_base_sq.get(key, 0.0) + base_sq
+
+    def relative(delta_sq: float, base_sq: float) -> float | None:
+        return math.sqrt(delta_sq / base_sq) if base_sq else None
+
+    return {
+        "global_relative_l2": relative(global_delta_sq, global_base_sq),
+        "blocks": {
+            key: relative(block_delta_sq[key], block_base_sq[key])
+            for key in block_delta_sq
+        },
+    }

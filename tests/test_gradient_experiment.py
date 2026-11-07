@@ -5,6 +5,7 @@ import math
 from pathlib import Path
 
 import pytest
+import torch
 
 
 MODULE_PATH = (
@@ -92,3 +93,78 @@ def test_schedule_digest_detects_modified_jsonl(tmp_path):
     path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8")
     with pytest.raises(ValueError, match="digest"):
         load_schedule(path, expected_digest=digest)
+
+
+def test_streaming_gradient_moments_match_exact_vector_statistics():
+    module = _module()
+    moments = module.GradientMoments()
+    samples = [
+        {"blocks.0.weight": torch.tensor([1.0, 2.0]), "head.weight": torch.tensor([3.0])},
+        {"blocks.0.weight": torch.tensor([3.0, 4.0]), "head.weight": torch.tensor([5.0])},
+    ]
+    originals = [{name: value.clone() for name, value in sample.items()} for sample in samples]
+    for sample in samples:
+        moments.add(sample)
+
+    summary = moments.summary()
+    stacked = torch.stack([torch.cat(list(sample.values())) for sample in samples])
+    mean = stacked.mean(dim=0)
+    expected_variance = (stacked.square().sum(dim=1).mean() - mean.square().sum()).item()
+    assert summary["count"] == 2
+    assert summary["mean_gradient_norm"] == pytest.approx(mean.norm().item())
+    assert summary["gradient_variance"] == pytest.approx(expected_variance)
+    assert summary["mean_sample_norm"] == pytest.approx(
+        stacked.norm(dim=1).mean().item()
+    )
+    for original, sample in zip(originals, samples):
+        assert all(torch.equal(original[name], sample[name]) for name in original)
+
+
+def test_gradient_cosine_and_zero_norm_are_defined_without_flattening():
+    module = _module()
+    left = {"a": torch.tensor([1.0, 0.0]), "b": torch.tensor([1.0])}
+    right = {"a": torch.tensor([0.0, 1.0]), "b": torch.tensor([1.0])}
+    assert module.gradient_cosine(left, right) == pytest.approx(0.5)
+    assert module.gradient_cosine(left, {name: torch.zeros_like(x) for name, x in left.items()}) is None
+
+
+def test_block_statistics_group_representative_dit_layers():
+    module = _module()
+    gradients = {
+        "transformer_blocks.0.attn.weight": torch.tensor([3.0]),
+        "transformer_blocks.0.ff.weight": torch.tensor([4.0]),
+        "transformer_blocks.11.attn.weight": torch.tensor([12.0]),
+        "proj_out.weight": torch.tensor([5.0]),
+    }
+    norms = module.block_gradient_norms(gradients)
+    assert norms == pytest.approx(
+        {"transformer_blocks.0": 5.0, "transformer_blocks.11": 12.0, "proj_out": 5.0}
+    )
+
+
+def test_clipping_metrics_report_scale_trigger_and_post_norm():
+    module = _module()
+    assert module.clipping_metrics(2.5, 1.0) == pytest.approx(
+        {"pre_clip_norm": 2.5, "post_clip_norm": 1.0, "clip_scale": 0.4, "clipped": 1.0}
+    )
+    assert module.clipping_metrics(0.5, 1.0) == pytest.approx(
+        {"pre_clip_norm": 0.5, "post_clip_norm": 0.5, "clip_scale": 1.0, "clipped": 0.0}
+    )
+
+
+def test_parameter_drift_reports_global_and_block_relative_l2_without_mutation():
+    module = _module()
+    baseline = {
+        "transformer_blocks.0.weight": torch.tensor([3.0, 4.0]),
+        "proj_out.weight": torch.tensor([12.0]),
+    }
+    current = {
+        "transformer_blocks.0.weight": torch.tensor([6.0, 8.0]),
+        "proj_out.weight": torch.tensor([12.0]),
+    }
+    originals = {name: value.clone() for name, value in current.items()}
+    drift = module.parameter_drift(baseline, current)
+    assert drift["global_relative_l2"] == pytest.approx(5.0 / 13.0)
+    assert drift["blocks"]["transformer_blocks.0"] == pytest.approx(1.0)
+    assert drift["blocks"]["proj_out"] == pytest.approx(0.0)
+    assert all(torch.equal(originals[name], current[name]) for name in current)
