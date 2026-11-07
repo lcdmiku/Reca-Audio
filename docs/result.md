@@ -296,6 +296,69 @@ IS 7.71 → 6.21（变差），KL 2.196 → **2.002（变好）**，FD 43.83 →
 | 训练代码 | `src/reca_audio/train/` | 说明见 [reca_training.md](reca_training.md) |
 | 旧轮次产物 | 已删除 | 为省磁盘删除；日志仍在 `runs/train/reca_*/train_log.jsonl` |
 
+### 5.7 Matrix v1：Pure ReCA / T2A-only / Mix 1:1（2026-11-07）
+
+本轮从同一个原始 Audio-Omni checkpoint 出发，三组都训练 2000 step。训练集是按音频
+SHA256 分组后的 3530 行（707 个唯一音频）；内部 test 是 445 行（89 个唯一音频），与
+train/val 的 sample ID 和音频 SHA256 交集均为 0。`task_mode=mix` 每个 batch 只采样一个
+任务，最终实际计数为 ReCA 1004 / T2A 996，不是每个 batch 同时计算两项 loss。
+
+生成评测统一使用 100-step ODE、CFG=6、fp16、seed=1234，以及 3 个双卡 shard（GPU
+0--5）。所有模型使用相同 prompts、分片和 seed 规则；8 个 case 均无生成失败。
+
+**AudioCaps held-out（445 条，越低：FAD/KL/FD；越高：IS/CLAP）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | **0.3514** | 2.1666 | **7.0272** | 64.0793 | **0.4610** |
+| Pure ReCA | 0.3839 | 2.0406 | 6.1474 | **61.2357** | 0.4310 |
+| T2A-only | 0.4287 | 2.0330 | 5.8390 | 65.1342 | 0.3945 |
+| Mix 1:1 | 0.4277 | **2.0213** | 5.9148 | 61.8488 | 0.3894 |
+
+**MusicCaps（1004 条）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | 0.3238 | 1.3412 | 3.4425 | 18.5154 | 0.3882 |
+| Pure ReCA | 0.2723 | 1.3633 | 3.5994 | 17.5523 | 0.4117 |
+| T2A-only | 0.3208 | **1.2922** | 3.2923 | 18.7068 | 0.4135 |
+| Mix 1:1 | **0.2611** | 1.3843 | **3.6931** | **16.2328** | **0.4147** |
+
+**Held-out reconstruction 诊断（24 条）**
+
+该诊断严格匹配训练数据通路：目标为原始 5 秒音频；Qwen 输入先从 16 kHz 降到 4 kHz
+再升回 16 kHz；`audio_input_prompt` 仍是模型固定要求的 10 秒静音；采样 100 step、
+CFG=1。24 条是 held-out test 中确定性排序后的前 24 条，因此只用于模型间配对诊断，
+不作为总体 benchmark 置信区间。
+
+| 模型 | 配对 CLAP cosine ↑ | CLAP-FAD ↓ | LSD ↓ |
+|---|---:|---:|---:|
+| Base | 0.1483 ± 0.1477 | 1.3833 | 63.0893 |
+| Pure ReCA | **0.2160 ± 0.1205** | **1.3465** | 61.7886 |
+| T2A-only | 0.1585 ± 0.1274 | 1.4005 | **60.9439** |
+| Mix 1:1 | 0.1950 ± 0.1333 | 1.3675 | 61.5467 |
+
+**源码事实与可支持的结论：**
+
+- Pure 和 Mix 的配对 CLAP reconstruction 都高于 Base，说明 reconstruction alignment
+  确实发生；Mix 的 alignment 弱于 Pure，符合它只有约一半 ReCA 更新。
+- 在 AudioCaps held-out 上，Pure 的 CLAP-FAD 更高、IS/CLAP 更低；Mix 不但没有保护
+  文本条件能力，CLAP 还比 Pure 更低。因此“1:1 T2A replay 足以阻止破坏”的假设被否定。
+- T2A-only 同样在 AudioCaps held-out 上明显退化，说明问题不能只归因于 audio hidden
+  states 的 acoustic shortcut；全量 DiT 持续训练造成的参数漂移、训练分布重复和目标形式
+  也可能是主要因素。
+- MusicCaps 上 Pure/Mix 出现相反的正迁移，Mix 在除 KL 外的四项指标最佳。因此本轮不是
+  “生成能力整体下降”，而是明显的域依赖 trade-off；不能用单一 AudioCaps 或训练 loss
+  概括整体能力。
+- 下一组最小实验应优先约束相对 Base 的参数漂移（更低 LR/更短训练、L2-SP/teacher
+  distillation，或仅训练 cross-attention/projection），而不是只继续提高 T2A batch 比例。
+
+产物：
+
+- 生成结果：`runs/Benchmark/output/Matrix_v1_eval3_6gpu_9ce3984/`
+- 重建诊断：`runs/Benchmark/output/Reconstruction_v4_6gpu_9ce3984/`
+- 训练日志：`runs/train/reca_matrix_v1/{pure,t2a,mix}/train_log.jsonl`
+
 ## 6. 状态总览
 
 | Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
