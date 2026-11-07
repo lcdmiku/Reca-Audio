@@ -35,9 +35,9 @@ class UniqueShaSubsetTests(unittest.TestCase):
 
         manifest = root / "test_manifest.jsonl"
         rows = [
-            {"id": "first", "prompt": "first caption", "audio": str(first)},
-            {"id": "duplicate", "prompt": "duplicate caption", "audio": str(duplicate)},
-            {"id": "second", "prompt": "second caption", "audio": str(second)},
+            {"caption": "first caption", "audio": str(first)},
+            {"caption": "duplicate caption", "audio": str(duplicate)},
+            {"caption": "second caption", "audio": str(second)},
         ]
         manifest.write_text(
             "".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8"

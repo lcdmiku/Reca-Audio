@@ -75,11 +75,11 @@ def build_unique_sha_subset(
         if not line:
             continue
         row = json.loads(line)
-        item_id = str(row["id"])
-        prompt = str(row["prompt"])
         audio_path = Path(row["audio"]).expanduser().resolve()
         if not audio_path.is_file():
             raise FileNotFoundError(f"missing audio file: {audio_path}")
+        item_id = str(row.get("id") or audio_path.stem)
+        prompt = str(row.get("prompt") or row.get("caption") or "audio")
         audio_sha = _sha256_file(audio_path)
         if audio_sha in seen_hashes:
             continue
