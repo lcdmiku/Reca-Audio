@@ -3,6 +3,8 @@ import importlib.util
 import json
 import math
 import random
+import gc
+import weakref
 from copy import deepcopy
 from pathlib import Path
 
@@ -186,6 +188,23 @@ def test_clipping_metrics_report_scale_trigger_and_post_norm():
     assert module.clipping_metrics(0.5, 1.0) == pytest.approx(
         {"pre_clip_norm": 0.5, "post_clip_norm": 0.5, "clip_scale": 1.0, "clipped": 0.0}
     )
+
+
+def test_collect_gradient_metrics_does_not_retain_gradient_tensors():
+    module = _module()
+    layer = torch.nn.Linear(2, 1)
+    layer(torch.ones(1, 2)).sum().backward()
+    old_grad = layer.weight.grad
+    reference = weakref.ref(old_grad)
+
+    metrics = module.collect_gradient_metrics(layer.named_parameters(), threshold=1.0)
+    assert metrics["pre_clip_norm"] > 0
+    assert "weight" in metrics["block_gradient_norms"]
+
+    layer.weight.grad = None
+    old_grad = None
+    gc.collect()
+    assert reference() is None
 
 
 def test_parameter_drift_reports_global_and_block_relative_l2_without_mutation():

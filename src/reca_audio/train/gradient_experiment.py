@@ -285,6 +285,19 @@ def clipping_metrics(pre_clip_norm: float, threshold: float) -> dict[str, float]
     }
 
 
+def collect_gradient_metrics(
+    named_parameters: Iterable[tuple[str, torch.nn.Parameter]],
+    threshold: float,
+) -> dict[str, Any]:
+    """Reduce live ``.grad`` tensors to scalars without returning references."""
+    gradients = {name: parameter.grad for name, parameter in named_parameters}
+    block_norms = block_gradient_norms(gradients)
+    pre_clip_norm = math.sqrt(sum(value * value for value in block_norms.values()))
+    metrics: dict[str, Any] = clipping_metrics(pre_clip_norm, threshold)
+    metrics["block_gradient_norms"] = block_norms
+    return metrics
+
+
 def parameter_drift(
     baseline: Mapping[str, torch.Tensor],
     current: Mapping[str, torch.Tensor],

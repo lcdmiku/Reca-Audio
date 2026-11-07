@@ -353,14 +353,16 @@ def _run(args: argparse.Namespace) -> int:
             for parameter_group in optimizer.param_groups:
                 parameter_group["lr"] = lr
             scaler.unscale_(optimizer)
-            gradient_map = {
-                name: parameter.grad
-                for name, parameter in dit.named_parameters()
-                if parameter.requires_grad
-            }
-            block_norms = helpers.block_gradient_norms(gradient_map)
-            pre_clip_norm = math.sqrt(sum(value * value for value in block_norms.values()))
-            clip = helpers.clipping_metrics(pre_clip_norm, args.grad_clip)
+            gradient_metrics = helpers.collect_gradient_metrics(
+                (
+                    (name, parameter)
+                    for name, parameter in dit.named_parameters()
+                    if parameter.requires_grad
+                ),
+                args.grad_clip,
+            )
+            block_norms = gradient_metrics.pop("block_gradient_norms")
+            pre_clip_norm = gradient_metrics["pre_clip_norm"]
             torch.nn.utils.clip_grad_norm_(parameters, args.grad_clip)
             scaler.step(optimizer)
             scaler.update()
@@ -375,7 +377,7 @@ def _run(args: argparse.Namespace) -> int:
                 "accumulation": accumulation,
                 "reca_loss": _average(task_losses["reca"]),
                 "t2a_loss": _average(task_losses["t2a"]),
-                "gradient": clip,
+                "gradient": gradient_metrics,
                 "block_gradient_norms": block_norms,
                 "elapsed_seconds": time.time() - started,
             }
