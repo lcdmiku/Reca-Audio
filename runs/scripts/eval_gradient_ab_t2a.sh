@@ -24,10 +24,11 @@ DTYPE="${DTYPE:-float16}"
 GPU_MEMORY_LIMIT_MIB="${GPU_MEMORY_LIMIT_MIB:-128}"
 SKIP_GPU_CHECK="${SKIP_GPU_CHECK:-0}"
 CONDA_ENV="${CONDA_ENV:-audio-omni}"
+CLAP_CKPT="${CLAP_CKPT:-${HOME}/.cache/laion_clap/630k-audioset-best.pt}"
 TMP_ROOT=""
 
 usage() {
-  echo "usage: bash runs/scripts/eval_gradient_ab_t2a.sh {dry-run|run|status}"
+  echo "usage: bash runs/scripts/eval_gradient_ab_t2a.sh {dry-run|run|resume|status}"
 }
 
 cleanup() {
@@ -50,9 +51,16 @@ activate_environment() {
   PYTHON_BIN="${PYTHON_BIN:-python}"
   export PYTHONPATH="${REPO_ROOT}/src:${REPO_ROOT}/Audio-Omni:${PYTHONPATH:-}"
   export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+  export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
+  export TRANSFORMERS_OFFLINE="${TRANSFORMERS_OFFLINE:-1}"
+  export CLAP_CKPT
   export QWEN_OMNI_MODEL_PATH="${QWEN_OMNI_MODEL_PATH:-$(find "${HOME}/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots" -mindepth 1 -maxdepth 1 -type d -print -quit)}"
   [[ -n "${QWEN_OMNI_MODEL_PATH}" ]] && [[ -d "${QWEN_OMNI_MODEL_PATH}" ]] || {
     echo "Qwen snapshot is unavailable; set QWEN_OMNI_MODEL_PATH" >&2
+    return 1
+  }
+  [[ -s "${CLAP_CKPT}" ]] || {
+    echo "CLAP checkpoint is unavailable: ${CLAP_CKPT}" >&2
     return 1
   }
 }
@@ -212,6 +220,12 @@ run_model() {
     bash runs/Benchmark/run_shards.sh --benchmark AudioCaps \
       --seconds "${AUDIO_SECONDS}" --seed "${SEED}"
   verify_generation "${model_out}"
+  score_model "${label}"
+}
+
+score_model() {
+  local label="$1"
+  local model_out="${OUT_ROOT}/${label}"
   write_status scoring "${label}"
   CUDA_VISIBLE_DEVICES="${SCORE_GPU}" "${PYTHON_BIN}" \
     runs/Benchmark/AudioCaps/evaluate.py score \
@@ -221,6 +235,30 @@ run_model() {
     return 1
   }
   echo "[$(date -Iseconds)] DONE model=${label}"
+}
+
+resume_model() {
+  local label="$1" dit_checkpoint="$2"
+  local model_out="${OUT_ROOT}/${label}"
+  if [[ -s "${model_out}/manifest.jsonl" ]]; then
+    verify_generation "${model_out}"
+    if [[ -s "${model_out}/results.json" ]]; then
+      echo "[resume] ${label} already scored"
+    else
+      score_model "${label}"
+    fi
+    return 0
+  fi
+  if [[ -e "${model_out}" ]]; then
+    echo "refusing partial model output without manifest: ${model_out}" >&2
+    return 1
+  fi
+  local merged="${TMP_ROOT}/model_${label}.ckpt"
+  write_status merging "${label}"
+  "${PYTHON_BIN}" -m reca_audio.train.merge_ckpt \
+    --ckpt "${BASE_CKPT}" --dit "${dit_checkpoint}" --out "${merged}"
+  run_model "${label}" "${merged}"
+  rm -f -- "${merged}"
 }
 
 show_status() {
@@ -299,9 +337,43 @@ run_formal() {
   echo "[$(date -Iseconds)] formal evaluation complete"
 }
 
+resume_formal() {
+  activate_environment
+  validate_inputs
+  [[ -d "${OUT_ROOT}" ]] || {
+    echo "resume output root is missing: ${OUT_ROOT}" >&2
+    return 1
+  }
+  [[ -s "${OUT_ROOT}/subset/prompts.jsonl" ]] && \
+    [[ -s "${OUT_ROOT}/subset/selection.json" ]] && \
+    [[ -d "${OUT_ROOT}/subset/ref" ]] || {
+      echo "resume subset is incomplete: ${OUT_ROOT}/subset" >&2
+      return 1
+    }
+  validate_gpus
+  TMP_ROOT="$(mktemp -d /tmp/reca-gradient-ab-eval.XXXXXX)"
+  exec > >(tee -a "${OUT_ROOT}/pipeline.log") 2>&1
+  echo "[$(date -Iseconds)] formal evaluation resume pid=$$"
+
+  verify_generation "${OUT_ROOT}/base"
+  if [[ -s "${OUT_ROOT}/base/results.json" ]]; then
+    echo "[resume] base already scored"
+  else
+    score_model base
+  fi
+  resume_model a "${A_DIT}"
+  resume_model b "${B_DIT}"
+
+  write_status complete
+  df -h /tmp "${HOME}"
+  du -sh "${HOME}"
+  echo "[$(date -Iseconds)] formal evaluation complete"
+}
+
 case "${ACTION}" in
   dry-run) dry_run ;;
   run) run_formal ;;
+  resume) resume_formal ;;
   status) show_status ;;
   *) usage >&2; exit 2 ;;
 esac
