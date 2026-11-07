@@ -359,6 +359,49 @@ CFG=1。24 条是 held-out test 中确定性排序后的前 24 条，因此只�
 - 重建诊断：`runs/Benchmark/output/Reconstruction_v4_6gpu_9ce3984/`
 - 训练日志：`runs/train/reca_matrix_v1/{pure,t2a,mix}/train_log.jsonl`
 
+### 5.8 Gradient accumulation 受控实验：单测、smoke 与静态诊断（2026-11-07）
+
+本阶段只验证诊断和等曝光 A/B 基础设施，**尚未启动 400 micro-batch A/B**。统一 LR
+曲线按 micro-batch 曝光量索引：总曝光 400、warmup 20、peak LR `2e-5`；B 每次 update
+使用四个曝光位置 LR 的平均值。Adafactor 的 `relative_step=False`、
+`scale_parameter=False`，内部没有 relative-step 调度。
+
+本地 23 项聚焦测试通过。服务器 smoke 使用同一份 4-record schedule（SHA256
+`67f8c82f...eedc6`），A 完成 4 次 update，B 完成 1 次 update：
+
+| Arm | 曝光 | updates | 实际 LR | pre-clip grad norm | 全局 drift（曝光 4） |
+|---|---:|---:|---|---|---:|
+| A / accum 1 | 4 | 4 | 2e-5 / 1.5e-5 / 5e-6 / 0 | 2.455 / 1.960 / 2.214 / 2.832 | 0.002328 |
+| B / accum 4 | 4 | 1 | **1.0e-5**（四位置均值） | 1.222 | 0.000942 |
+
+所有 smoke update 的 pre-clip norm 都大于阈值 1，因此都触发 gradient clipping。两臂
+均完成 exposure 0/4 固定诊断；checkpoint 保存、reload 校验成功并立即删除，没有保留
+smoke 权重。smoke 只用 1 个诊断样本，variance 必然为 0，不能用于判断 accumulation
+是否降低方差。
+
+原始 checkpoint 的正式静态诊断使用 held-out test 前 8 个样本，同一音频分别计算
+ReCA/T2A 梯度，不创建 optimizer、没有 `optimizer.step()`：
+
+| 指标 | ReCA | T2A |
+|---|---:|---:|
+| mean loss | 1.01485 | 1.00109 |
+| mean sample gradient norm | 3.52132 | 3.66839 |
+| mean gradient norm | 1.43977 | 1.64179 |
+| gradient variance trace | 13.48325 | 17.49572 |
+
+同一样本 ReCA/T2A 梯度 cosine 的均值为 **0.74650**，8 个样本上整体为正，因此在原始
+checkpoint 处没有观察到强烈的全局反向冲突；但这不能推出训练过程中始终无冲突。
+逐 block cosine 呈明显深度结构：早中层最低的是 layer 5（0.527）、layer 3（0.556）、
+layer 6（0.563），后层 layer 30--35 大约为 0.91--0.94。ReCA/T2A 的归一化方差量级
+接近（全局约 6.5 倍 mean-gradient squared norm），说明小 batch 的样本梯度噪声很大，
+但仅凭静态结果还不能证明 accumulation=4 会改善最终 T2A。
+
+产物：
+
+- smoke：`runs/train/reca_gradient_ab_smoke_02cf985/`
+- 静态诊断：`runs/train/reca_gradient_static_02cf985/static/metrics.jsonl`
+- 两处均无模型权重；完成后 `/home/linchudeng` 仍约 350G。
+
 ## 6. 状态总览
 
 | Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
