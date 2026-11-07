@@ -5,8 +5,9 @@ import hashlib
 import json
 import math
 import random
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Iterator, Mapping
 
 import torch
 
@@ -239,5 +240,57 @@ def parameter_drift(
         "blocks": {
             key: relative(block_delta_sq[key], block_base_sq[key])
             for key in block_delta_sq
+        },
+    }
+
+
+@contextmanager
+def isolated_rng(seed: int) -> Iterator[None]:
+    """Temporarily seed Python/Torch RNGs and restore their exact states."""
+    python_state = random.getstate()
+    torch_state = torch.random.get_rng_state()
+    cuda_states = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
+    try:
+        random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        yield
+    finally:
+        random.setstate(python_state)
+        torch.random.set_rng_state(torch_state)
+        if cuda_states is not None:
+            torch.cuda.set_rng_state_all(cuda_states)
+
+
+def diagnostic_gradient(
+    model: torch.nn.Module,
+    loss_closure: Callable[[], torch.Tensor],
+    seed: int,
+) -> dict[str, Any]:
+    """Evaluate one gradient without touching ``.grad`` or optimizer state."""
+    named_parameters = [
+        (name, parameter)
+        for name, parameter in model.named_parameters()
+        if parameter.requires_grad
+    ]
+    with isolated_rng(seed):
+        loss = loss_closure()
+        if loss.ndim != 0:
+            raise ValueError("diagnostic loss must be scalar")
+        gradients = torch.autograd.grad(
+            loss,
+            [parameter for _, parameter in named_parameters],
+            allow_unused=True,
+        )
+    return {
+        "loss": float(loss.detach().to(device="cpu", dtype=torch.float64).item()),
+        "gradients": {
+            name: (
+                gradient.detach().to(device="cpu", dtype=torch.float32).clone()
+                if gradient is not None
+                else None
+            )
+            for (name, _), gradient in zip(named_parameters, gradients)
         },
     }

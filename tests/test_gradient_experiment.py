@@ -2,6 +2,8 @@ import hashlib
 import importlib.util
 import json
 import math
+import random
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -168,3 +170,68 @@ def test_parameter_drift_reports_global_and_block_relative_l2_without_mutation()
     assert drift["blocks"]["transformer_blocks.0"] == pytest.approx(1.0)
     assert drift["blocks"]["proj_out"] == pytest.approx(0.0)
     assert all(torch.equal(originals[name], current[name]) for name in current)
+
+
+def _assert_nested_tensors_equal(left, right):
+    if isinstance(left, torch.Tensor):
+        assert torch.equal(left, right)
+    elif isinstance(left, dict):
+        assert left.keys() == right.keys()
+        for key in left:
+            _assert_nested_tensors_equal(left[key], right[key])
+    elif isinstance(left, (tuple, list)):
+        assert len(left) == len(right)
+        for lhs, rhs in zip(left, right):
+            _assert_nested_tensors_equal(lhs, rhs)
+    else:
+        assert left == right
+
+
+def test_diagnostic_gradient_restores_rng_parameters_gradients_and_optimizer_state():
+    module = _module()
+    torch.manual_seed(123)
+    random.seed(456)
+    model = torch.nn.Sequential(torch.nn.Linear(2, 3), torch.nn.Linear(3, 1))
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    optimizer.zero_grad()
+    model(torch.ones(1, 2)).sum().backward()
+    optimizer.step()
+    for index, parameter in enumerate(model.parameters()):
+        parameter.grad = torch.full_like(parameter, float(index + 1))
+
+    params_before = {name: value.detach().clone() for name, value in model.named_parameters()}
+    grads_before = {
+        name: value.grad.detach().clone() if value.grad is not None else None
+        for name, value in model.named_parameters()
+    }
+    optimizer_before = deepcopy(optimizer.state_dict())
+    python_rng_before = random.getstate()
+    torch_rng_before = torch.random.get_rng_state().clone()
+
+    def loss_closure():
+        scale = random.random() + torch.rand(()).item()
+        return model(torch.tensor([[0.25, -0.5]])).square().mean() * scale
+
+    result = module.diagnostic_gradient(model, loss_closure, seed=999)
+
+    assert result["loss"] >= 0
+    assert result["gradients"].keys() == dict(model.named_parameters()).keys()
+    assert random.getstate() == python_rng_before
+    assert torch.equal(torch.random.get_rng_state(), torch_rng_before)
+    for name, parameter in model.named_parameters():
+        assert torch.equal(parameter, params_before[name])
+        assert torch.equal(parameter.grad, grads_before[name])
+    _assert_nested_tensors_equal(optimizer.state_dict(), optimizer_before)
+
+
+def test_diagnostic_gradient_is_repeatable_for_a_fixed_seed():
+    module = _module()
+    model = torch.nn.Linear(2, 1)
+
+    def loss_closure():
+        return model(torch.rand(1, 2)).square().mean() * (1.0 + random.random())
+
+    first = module.diagnostic_gradient(model, loss_closure, seed=77)
+    second = module.diagnostic_gradient(model, loss_closure, seed=77)
+    assert first["loss"] == pytest.approx(second["loss"])
+    assert module.gradient_cosine(first["gradients"], second["gradients"]) == pytest.approx(1.0)
