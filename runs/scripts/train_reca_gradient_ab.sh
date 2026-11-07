@@ -46,6 +46,7 @@ case "${ACTION}" in
     DIAGNOSTIC_EXPOSURES="0,4"
     SAVE_EXPOSURES="4"
     FORMAL_FLAG=()
+    CHECKPOINT_FLAG=()
     ;;
   static)
     TOTAL=400
@@ -54,6 +55,7 @@ case "${ACTION}" in
     DIAGNOSTIC_EXPOSURES="0"
     SAVE_EXPOSURES=""
     FORMAL_FLAG=()
+    CHECKPOINT_FLAG=()
     ;;
   run)
     if [[ "${ALLOW_FORMAL:-0}" != "1" ]]; then
@@ -66,6 +68,7 @@ case "${ACTION}" in
     DIAGNOSTIC_EXPOSURES="0,100,200,400"
     SAVE_EXPOSURES="100,200,400"
     FORMAL_FLAG=(--allow-formal)
+    CHECKPOINT_FLAG=(--keep-final-checkpoint)
     ;;
   status)
     find "${OUT_ROOT}" -maxdepth 2 -type f \( -name 'metrics.jsonl' -o -name '*.log' \) -print 2>/dev/null || true
@@ -114,6 +117,7 @@ common=(
   --omni-downsample 4
   --omni-seconds 0
   "${FORMAL_FLAG[@]}"
+  "${CHECKPOINT_FLAG[@]}"
 )
 
 if [[ "${ACTION}" == "static" ]]; then

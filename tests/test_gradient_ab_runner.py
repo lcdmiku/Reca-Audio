@@ -94,6 +94,7 @@ def test_launcher_guards_formal_run_and_reuses_one_schedule():
     assert '--arm a' in text
     assert '--arm b' in text
     assert '--prepare-only' in text
+    assert '--keep-final-checkpoint' in text
 
 
 def test_training_gradients_are_released_before_periodic_diagnostics():

@@ -217,8 +217,8 @@ ALLOW_FORMAL=1 OUT_ROOT=runs/train/reca_gradient_ab_v1 \
 
 诊断记录 ReCA/T2A loss、全局及逐 block gradient norm/variance/cosine、裁剪比例、参数
 相对 L2 drift、实际 LR 与累计曝光量。固定诊断通过 `autograd.grad` 执行，并恢复 RNG，
-不修改 optimizer/scaler 或模型参数。checkpoint 会保存并 reload 校验；除显式要求保留的
-最终 checkpoint 外，诊断用临时权重随即删除以控制磁盘占用。
+不修改 optimizer/scaler 或模型参数。checkpoint 会保存并 reload 校验；smoke 和正式运行的
+中间权重随即删除，正式 A/B 各只保留 exposure 400 最终 checkpoint 供后续 T2A 评测。
 
 ## 用法
 
