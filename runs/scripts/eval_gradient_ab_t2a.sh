@@ -18,7 +18,7 @@ GPUS_PER_PROC="${GPUS_PER_PROC:-2}"
 SCORE_GPU="${SCORE_GPU:-6}"
 STEPS="${STEPS:-100}"
 CFG="${CFG:-6.0}"
-SECONDS="${SECONDS:-10}"
+AUDIO_SECONDS="${AUDIO_SECONDS:-10}"
 SEED="${SEED:-1234}"
 DTYPE="${DTYPE:-float16}"
 GPU_MEMORY_LIMIT_MIB="${GPU_MEMORY_LIMIT_MIB:-128}"
@@ -164,7 +164,7 @@ payload = {
                           "a_optimizer_updates": 400, "b_optimizer_updates": 100},
     "subset": {"expected_unique_sha256": ${EXPECTED_COUNT}},
     "generation": {"seed": ${SEED}, "steps": ${STEPS}, "cfg": ${CFG},
-                   "seconds": ${SECONDS}, "dtype": "${DTYPE}"},
+                   "seconds": ${AUDIO_SECONDS}, "dtype": "${DTYPE}"},
     "parallelism": {"gpu_ids": gpu_ids, "num_shards": ${NUM_SHARDS},
                     "gpus_per_process": ${GPUS_PER_PROC}, "score_gpu": "${SCORE_GPU}"},
 }
@@ -210,7 +210,7 @@ run_model() {
   GPU_IDS="${GPU_IDS}" NUM_SHARDS="${NUM_SHARDS}" GPUS_PER_PROC="${GPUS_PER_PROC}" \
   STEPS="${STEPS}" CFG="${CFG}" DTYPE="${DTYPE}" REF="" \
     bash runs/Benchmark/run_shards.sh --benchmark AudioCaps \
-      --seconds "${SECONDS}" --seed "${SEED}"
+      --seconds "${AUDIO_SECONDS}" --seed "${SEED}"
   verify_generation "${model_out}"
   write_status scoring "${label}"
   CUDA_VISIBLE_DEVICES="${SCORE_GPU}" "${PYTHON_BIN}" \
@@ -256,7 +256,7 @@ data = json.load(open(sys.argv[1], encoding="utf-8"))
 print(f"[dry-run] subset_count={data['count']} prompts_sha256={data['prompts_sha256']}")
 PY
   echo "[dry-run] order=base,a,b gpus=${GPU_IDS} shards=${NUM_SHARDS}x${GPUS_PER_PROC}"
-  echo "[dry-run] seed=${SEED} steps=${STEPS} cfg=${CFG} seconds=${SECONDS} dtype=${DTYPE}"
+  echo "[dry-run] seed=${SEED} steps=${STEPS} cfg=${CFG} seconds=${AUDIO_SECONDS} dtype=${DTYPE}"
   echo "[dry-run] strict merge: ${A_DIT} -> /tmp/.../model_a.ckpt"
   echo "[dry-run] strict merge: ${B_DIT} -> /tmp/.../model_b.ckpt"
   echo "[dry-run] output=${OUT_ROOT}"
