@@ -57,6 +57,36 @@ def validate_experiment_shape(total_exposures: int, accumulation: int) -> None:
         raise ValueError("total_exposures must be divisible by accumulation")
 
 
+def arm_spec(
+    arm: str,
+    total_exposures: int,
+    warmup_exposures: int,
+    peak_lr: float,
+) -> dict[str, Any]:
+    if arm not in {"a", "b"}:
+        raise ValueError("arm must be 'a' or 'b'")
+    accumulation = 1 if arm == "a" else 4
+    validate_experiment_shape(total_exposures, accumulation)
+    updates = []
+    for start in range(1, total_exposures + 1, accumulation):
+        updates.append(
+            {
+                "start_exposure": start,
+                "end_exposure": start + accumulation - 1,
+                "lr": update_lr(
+                    start, accumulation, total_exposures, warmup_exposures, peak_lr
+                ),
+            }
+        )
+    return {
+        "arm": arm,
+        "accumulation": accumulation,
+        "total_exposures": total_exposures,
+        "optimizer_updates": len(updates),
+        "updates": updates,
+    }
+
+
 def generate_schedule(
     total_exposures: int,
     manifest_size: int,
@@ -158,6 +188,24 @@ def block_gradient_norms(
     return {key: math.sqrt(value) for key, value in squares.items()}
 
 
+def block_gradient_cosines(
+    left: Mapping[str, torch.Tensor | None],
+    right: Mapping[str, torch.Tensor | None],
+) -> dict[str, float | None]:
+    if left.keys() != right.keys():
+        raise ValueError("gradient mappings must have identical parameter names")
+    grouped_left: dict[str, dict[str, torch.Tensor | None]] = {}
+    grouped_right: dict[str, dict[str, torch.Tensor | None]] = {}
+    for name in left:
+        key = block_name(name)
+        grouped_left.setdefault(key, {})[name] = left[name]
+        grouped_right.setdefault(key, {})[name] = right[name]
+    return {
+        key: gradient_cosine(grouped_left[key], grouped_right[key])
+        for key in grouped_left
+    }
+
+
 class GradientMoments:
     """Exact vector moments while retaining only one running gradient sum."""
 
@@ -166,6 +214,7 @@ class GradientMoments:
         self._sum: dict[str, torch.Tensor] = {}
         self._sum_sample_sq_norm = 0.0
         self._sum_sample_norm = 0.0
+        self._block_sum_sample_sq_norm: dict[str, float] = {}
 
     def add(self, gradients: Mapping[str, torch.Tensor | None]) -> None:
         sample_sq = 0.0
@@ -174,7 +223,12 @@ class GradientMoments:
             raise ValueError("all gradient samples must have identical parameter names")
         for name, tensor in present.items():
             detached = tensor.detach().to(device="cpu", dtype=torch.float32)
-            sample_sq += torch.sum(detached.to(torch.float64).square()).item()
+            tensor_sq = torch.sum(detached.to(torch.float64).square()).item()
+            sample_sq += tensor_sq
+            key = block_name(name)
+            self._block_sum_sample_sq_norm[key] = (
+                self._block_sum_sample_sq_norm.get(key, 0.0) + tensor_sq
+            )
             if name not in self._sum:
                 self._sum[name] = detached.clone()
             else:
@@ -196,6 +250,26 @@ class GradientMoments:
             "mean_gradient_norm": math.sqrt(mean_sq),
             "mean_sample_norm": self._sum_sample_norm / self.count,
             "gradient_variance": variance,
+        }
+
+    def block_summary(self) -> dict[str, dict[str, float]]:
+        if not self.count:
+            raise ValueError("no gradient samples were added")
+        block_mean_sq: dict[str, float] = {}
+        for name, value in self._sum.items():
+            key = block_name(name)
+            block_mean_sq[key] = block_mean_sq.get(key, 0.0) + torch.sum(
+                (value.to(torch.float64) / self.count).square()
+            ).item()
+        return {
+            key: {
+                "mean_gradient_norm": math.sqrt(mean_sq),
+                "gradient_variance": max(
+                    0.0,
+                    self._block_sum_sample_sq_norm[key] / self.count - mean_sq,
+                ),
+            }
+            for key, mean_sq in block_mean_sq.items()
         }
 
 

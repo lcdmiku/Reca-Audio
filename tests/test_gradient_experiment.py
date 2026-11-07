@@ -144,6 +144,40 @@ def test_block_statistics_group_representative_dit_layers():
     )
 
 
+def test_block_moments_and_cross_task_cosines_are_exact():
+    module = _module()
+    moments = module.GradientMoments()
+    moments.add({"blocks.0.weight": torch.tensor([1.0]), "blocks.1.weight": torch.tensor([2.0])})
+    moments.add({"blocks.0.weight": torch.tensor([3.0]), "blocks.1.weight": torch.tensor([4.0])})
+    blocks = moments.block_summary()
+    assert blocks["blocks.0"]["mean_gradient_norm"] == pytest.approx(2.0)
+    assert blocks["blocks.0"]["gradient_variance"] == pytest.approx(1.0)
+    assert blocks["blocks.1"]["mean_gradient_norm"] == pytest.approx(3.0)
+    assert blocks["blocks.1"]["gradient_variance"] == pytest.approx(1.0)
+
+    left = {"blocks.0.weight": torch.tensor([1.0, 0.0]), "blocks.1.weight": torch.tensor([1.0])}
+    right = {"blocks.0.weight": torch.tensor([0.0, 1.0]), "blocks.1.weight": torch.tensor([-1.0])}
+    assert module.block_gradient_cosines(left, right) == pytest.approx(
+        {"blocks.0": 0.0, "blocks.1": -1.0}
+    )
+
+
+def test_arm_spec_aligns_exposures_but_not_optimizer_updates():
+    module = _module()
+    arm_a = module.arm_spec("a", total_exposures=400, warmup_exposures=20, peak_lr=2e-5)
+    arm_b = module.arm_spec("b", total_exposures=400, warmup_exposures=20, peak_lr=2e-5)
+    assert arm_a["accumulation"] == 1
+    assert arm_a["optimizer_updates"] == 400
+    assert arm_b["accumulation"] == 4
+    assert arm_b["optimizer_updates"] == 100
+    assert arm_a["total_exposures"] == arm_b["total_exposures"] == 400
+    assert arm_b["updates"][0] == {
+        "start_exposure": 1,
+        "end_exposure": 4,
+        "lr": pytest.approx(sum(module.exposure_lr(i, 400, 20, 2e-5) for i in range(1, 5)) / 4),
+    }
+
+
 def test_clipping_metrics_report_scale_trigger_and_post_norm():
     module = _module()
     assert module.clipping_metrics(2.5, 1.0) == pytest.approx(
