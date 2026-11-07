@@ -92,3 +92,12 @@ def test_launcher_guards_formal_run_and_reuses_one_schedule():
     assert '--arm a' in text
     assert '--arm b' in text
     assert '--prepare-only' in text
+
+
+def test_training_gradients_are_released_before_periodic_diagnostics():
+    text = RUNNER.read_text(encoding="utf-8")
+    step = text.index("scaler.step(optimizer)")
+    update = text.index("scaler.update()", step)
+    release = text.index("optimizer.zero_grad(set_to_none=True)", update)
+    diagnostic = text.index("if exposure in diagnostic_exposures", update)
+    assert update < release < diagnostic

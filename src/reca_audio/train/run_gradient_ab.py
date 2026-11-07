@@ -366,6 +366,9 @@ def _run(args: argparse.Namespace) -> int:
             torch.nn.utils.clip_grad_norm_(parameters, args.grad_clip)
             scaler.step(optimizer)
             scaler.update()
+            # Fixed diagnostics use autograd.grad and therefore need their own
+            # gradient buffers. Release the completed training update first.
+            optimizer.zero_grad(set_to_none=True)
             update_index += 1
             record = {
                 "kind": "optimizer_step",
