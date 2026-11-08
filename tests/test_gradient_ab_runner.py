@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -83,6 +84,50 @@ def test_prepare_only_is_not_mistaken_for_formal_training():
         "--prepare-only",
     ])
     module.validate_args(args)
+
+
+@pytest.mark.parametrize("task_mode", ["random_mix", "pure", "t2a", "balanced_mix"])
+def test_runner_contract_records_task_mode(task_mode):
+    module = _runner()
+    args = module.parse_args([
+        "--arm", "b",
+        "--manifest", "train.jsonl",
+        "--diagnostic-manifest", "test.jsonl",
+        "--out", "output",
+        "--schedule", "schedule.jsonl",
+        "--task-mode", task_mode,
+        "--total-exposures", "4",
+        "--warmup-exposures", "1",
+        "--diagnostic-exposures", "0,4",
+        "--save-exposures", "4",
+    ])
+    assert module.experiment_contract(args)["task_mode"] == task_mode
+
+
+def test_runner_rejects_unknown_task_mode():
+    with pytest.raises(SystemExit):
+        _runner().parse_args(["--task-mode", "unknown"])
+
+
+def test_prepare_schedule_uses_selected_task_mode(tmp_path):
+    module = _runner()
+    manifest = tmp_path / "train.jsonl"
+    manifest.write_text(json.dumps({"audio": "unused.wav"}) + "\n", encoding="utf-8")
+    schedule = tmp_path / "schedule.jsonl"
+    args = module.parse_args([
+        "--arm", "b",
+        "--manifest", str(manifest),
+        "--schedule", str(schedule),
+        "--task-mode", "balanced_mix",
+        "--total-exposures", "4",
+        "--warmup-exposures", "1",
+        "--prepare-only",
+    ])
+
+    module._prepare_schedule(args)
+
+    tasks = [json.loads(line)["task"] for line in schedule.read_text().splitlines()]
+    assert tasks.count("reca") == tasks.count("t2a") == 2
 
 
 def test_launcher_guards_formal_run_and_reuses_one_schedule():

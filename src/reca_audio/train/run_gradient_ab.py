@@ -30,6 +30,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--out", default="")
     parser.add_argument("--schedule", required=True)
     parser.add_argument("--schedule-digest", default="")
+    parser.add_argument(
+        "--task-mode",
+        choices=["random_mix", "pure", "t2a", "balanced_mix"],
+        default="random_mix",
+    )
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--allow-formal", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -102,6 +107,7 @@ def experiment_contract(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "arm": args.arm,
         "schedule": args.schedule,
+        "task_mode": args.task_mode,
         "total_exposures": args.total_exposures,
         "warmup_exposures": args.warmup_exposures,
         "peak_lr": args.peak_lr,
@@ -132,7 +138,10 @@ def _manifest_size(path: str | Path) -> int:
 def _prepare_schedule(args: argparse.Namespace) -> str:
     helpers = _helpers()
     records = helpers.generate_schedule(
-        args.total_exposures, _manifest_size(args.manifest), args.seed
+        args.total_exposures,
+        _manifest_size(args.manifest),
+        args.seed,
+        task_mode=args.task_mode,
     )
     digest = helpers.write_schedule(args.schedule, records)
     Path(args.schedule).with_suffix(Path(args.schedule).suffix + ".sha256").write_text(
