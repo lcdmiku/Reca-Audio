@@ -503,7 +503,7 @@ accumulation 4 并非所有指标一致占优，且 89 条上的分布指标方�
 - 评测：`runs/Benchmark/output/GradientAB_T2A_89_fc1a3eb/`（约 495 MB）
 - Base/A/B 指标：各自子目录的 `results.json`
 - 子集 provenance：`subset/selection.json` 与 `run_contract.json`
-- 最终评测启动器部署版本：`182d9a2`
+- 实际断点续跑版本：`182d9a2`；最终 hardened 启动器部署版本：`d55227a`
 - A/B DiT checkpoint 各约 12 GB，继续保留；完成后用户目录仍约 373G。
 
 ## 6. 状态总览
