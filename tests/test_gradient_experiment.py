@@ -80,6 +80,31 @@ def test_schedule_is_deterministic_and_contains_shared_task_sequence():
     assert all({"data_seed", "flow_seed", "prompt_seed"} <= row.keys() for row in first)
 
 
+def test_task_specific_schedules_share_samples_and_rng_fields():
+    generate_schedule = _module().generate_schedule
+
+    schedules = {
+        mode: generate_schedule(2000, manifest_size=707, seed=42, task_mode=mode)
+        for mode in ("pure", "t2a", "balanced_mix")
+    }
+    for rows in zip(*schedules.values()):
+        stripped = [{key: value for key, value in row.items() if key != "task"} for row in rows]
+        assert stripped[0] == stripped[1] == stripped[2]
+
+    assert [row["task"] for row in schedules["pure"]].count("reca") == 2000
+    assert [row["task"] for row in schedules["t2a"]].count("t2a") == 2000
+    mix_tasks = [row["task"] for row in schedules["balanced_mix"]]
+    assert mix_tasks.count("reca") == mix_tasks.count("t2a") == 1000
+    for start in range(0, len(mix_tasks), 4):
+        assert mix_tasks[start : start + 4].count("reca") == 2
+        assert mix_tasks[start : start + 4].count("t2a") == 2
+
+
+def test_schedule_rejects_unknown_task_mode():
+    with pytest.raises(ValueError, match="task_mode"):
+        _module().generate_schedule(4, manifest_size=2, seed=42, task_mode="unknown")
+
+
 def test_schedule_digest_detects_modified_jsonl(tmp_path):
     module = _module()
     generate_schedule = module.generate_schedule

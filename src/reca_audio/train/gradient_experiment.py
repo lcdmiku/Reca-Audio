@@ -92,20 +92,38 @@ def generate_schedule(
     manifest_size: int,
     seed: int,
     reca_probability: float = 0.5,
+    task_mode: str = "random_mix",
 ) -> list[dict[str, Any]]:
     """Generate the immutable sample/task/RNG sequence shared by both arms."""
     if total_exposures <= 0 or manifest_size <= 0:
         raise ValueError("total_exposures and manifest_size must be positive")
     if not 0.0 <= reca_probability <= 1.0:
         raise ValueError("reca_probability must be in [0, 1]")
+    if task_mode not in {"random_mix", "pure", "t2a", "balanced_mix"}:
+        raise ValueError(f"unsupported task_mode: {task_mode}")
     rng = random.Random(seed)
     records = []
+    first_pair_task = "reca"
     for exposure in range(1, total_exposures + 1):
+        sample_index = rng.randrange(manifest_size)
+        task_draw = rng.random()
+        if task_mode == "pure":
+            task = "reca"
+        elif task_mode == "t2a":
+            task = "t2a"
+        elif task_mode == "balanced_mix":
+            if exposure % 2:
+                first_pair_task = "reca" if task_draw < 0.5 else "t2a"
+                task = first_pair_task
+            else:
+                task = "t2a" if first_pair_task == "reca" else "reca"
+        else:
+            task = "reca" if task_draw < reca_probability else "t2a"
         records.append(
             {
                 "exposure": exposure,
-                "sample_index": rng.randrange(manifest_size),
-                "task": "reca" if rng.random() < reca_probability else "t2a",
+                "sample_index": sample_index,
+                "task": task,
                 "data_seed": rng.randrange(2**63),
                 "flow_seed": rng.randrange(2**63),
                 "prompt_seed": rng.randrange(2**63),
