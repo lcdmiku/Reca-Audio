@@ -458,6 +458,54 @@ loss 不劣于 A，但该 loss 不是 T2A 生成指标；在对两个最终 chec
 - `runs/train/reca_gradient_ab_v1/{a,b}/metrics.jsonl`
 - 完成后 `/home/linchudeng` 约 373G，GPU 与实验进程均已释放。
 
+### 5.10 Equal-exposure A/B：89-clip held-out T2A（2026-11-08）
+
+为回答“更稳定、漂移更小的 accumulation 4 是否保留更多文本生成能力”，从 SHA 隔离的
+AudioCaps test 分区按 manifest 首次出现顺序，每个唯一音频 SHA256 只保留一条 caption，
+得到 89 条确定性诊断集。prompt manifest SHA256 为
+`006c0fbb...1a2401e`；Base/A/B 共用 prompt 顺序、分片和 seed。生成统一使用 100-step
+ODE、CFG=6、10 秒、fp16、seed=1234，以及 GPU 1--6 上的三个双卡 shard。
+
+A/B 都是同一条 400-micro-batch Mix 序列（ReCA 211 / T2A 189）训练出的 checkpoint，
+不是 Pure ReCA。A 执行 400 次 accumulation-1 update；B 执行 100 次 accumulation-4
+update。两者数据曝光量相同，但 optimizer update 数不同。
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | **0.42515** | 2.19518 | **6.84548** | **70.65282** | **0.46226** |
+| A / accum 1 | 0.52285 | 2.27633 | 6.47920 | 80.23866 | 0.39179 |
+| B / accum 4 | 0.46687 | **2.13032** | 6.37711 | 77.04059 | 0.44044 |
+
+相对 Base，A 的 CLAP 下降 0.07047、CLAP-FAD 增加 0.09770；B 的 CLAP 只下降
+0.02181、CLAP-FAD 增加 0.04172。B 相对 A 的 CLAP 提高 0.04865，并将相对 Base 的
+CLAP 损失缩小约 69%；CLAP-FAD、KL 和 FD 也都优于 A，但 IS 比 A 低 0.10209。因此
+accumulation 4 并非所有指标一致占优，且 89 条上的分布指标方差较大。
+
+**可支持的结论：**
+
+- 在相同 400 次数据曝光下，B 的 update 更稳定、global drift 更低，同时 T2A CLAP
+  明显更接近 Base；方向上支持“限制参数漂移有助于保留文本条件能力”。
+- B 仍未恢复 Base：CLAP 低 0.02181，CLAP-FAD 和 FD 仍更差。因此增大 effective
+  batch 只能缓解、不能消除短程 Mix 后训练的 catastrophic interference。
+- B 的 KL 优于 Base，但 IS/FD/CLAP 没有同步改善；不能把单个分布指标解释为 T2A
+  整体变好。
+- 这里只有 A/B 两个训练制度，且 update 数也不同，不能建立 drift 与指标的统计相关性，
+  也不能把差异唯一归因于“梯度方差降低”。
+- 结果支持下一步在 accumulation 4 下单独测试更低 peak LR，而不是立刻启动长训练。
+
+运行过程中先由 Linux dry-run 发现 Bash 特殊变量 `SECONDS` 会使输出时长漂移，正式运行
+前改为 `AUDIO_SECONDS=10`。Base 首次评分又因未导出 `CLAP_CKPT` 而尝试联网下载并失败；
+89 条 Base 音频完整保留，随后使用本地 1.8 GB CLAP 与 313 MB PANNs 缓存、offline 模式
+断点续跑，没有重复生成 Base。最终三组均为 89/89，无残留 `/tmp` 合并 checkpoint。
+
+产物：
+
+- 评测：`runs/Benchmark/output/GradientAB_T2A_89_fc1a3eb/`（约 495 MB）
+- Base/A/B 指标：各自子目录的 `results.json`
+- 子集 provenance：`subset/selection.json` 与 `run_contract.json`
+- 最终评测启动器部署版本：`182d9a2`
+- A/B DiT checkpoint 各约 12 GB，继续保留；完成后用户目录仍约 373G。
+
 ## 6. 状态总览
 
 | Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
@@ -499,9 +547,11 @@ bash runs/Benchmark/run_shards.sh --benchmark MMAU
 
 ## 9. 下一步
 
-1. **ReCA 混合训练**：b6 已验证纯重建（λ_T2A=0）会让 T2A 变差（FAD +0.030、CLIP −0.041），
-   下一步按 `TASK_MODE=mix LAMBDA_T2A=1` 重跑，验证“重建 + 文本各半”能否兼顾（代码已支持，未实跑）；
-2. 若混合仍无收益，改为**只训部分参数**（如 cross-attn 投影层）做轻量对齐；
-3. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）；
-4. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
-5. 用 b6（修复 `<|AUDIO|>` 后重训）的结果替换第 5 节中作废的旧轮次。
+1. 在相同 400-micro-batch schedule 上增加一个 **accumulation 4、peak LR `1e-5`** 的
+   小规模 C 组，其他因素保持与 B 相同；重点验证进一步降低 drift 能否缩小剩余的
+   Base--B CLAP gap，仍不启动完整训练；
+2. 若低 LR 仍不能保留 Base，再改为**只训部分参数**（如 cross-attn/projection）或加入
+   L2-SP / Base teacher 约束，而不是继续单独提高 T2A batch 比例；
+3. 在小规模配置通过后，再用 445 条 held-out AudioCaps 和 MusicCaps 做正式域内/域外验证；
+4. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）；
+5. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异。
