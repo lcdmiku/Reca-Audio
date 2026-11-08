@@ -207,6 +207,41 @@ print(f"[verify] complete generation rows={len(rows)} wav={len(audio)}")
 PY
 }
 
+validate_resume_subset() {
+  "${PYTHON_BIN}" - \
+    "${OUT_ROOT}/subset/selection.json" \
+    "${OUT_ROOT}/subset/prompts.jsonl" \
+    "${OUT_ROOT}/subset/ref" \
+    "${EXPECTED_COUNT}" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+
+metadata_path = pathlib.Path(sys.argv[1])
+prompts_path = pathlib.Path(sys.argv[2])
+refs_path = pathlib.Path(sys.argv[3])
+expected = int(sys.argv[4])
+metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+rows = [json.loads(line) for line in prompts_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+prompt_sha = hashlib.sha256(prompts_path.read_bytes()).hexdigest()
+selected = metadata.get("selected", [])
+if metadata.get("count") != expected or metadata.get("expected_count") != expected:
+    raise SystemExit("resume subset metadata count mismatch")
+if len(rows) != expected or len(selected) != expected:
+    raise SystemExit("resume subset row count mismatch")
+if metadata.get("prompts_sha256") != prompt_sha:
+    raise SystemExit("resume subset prompt SHA256 mismatch")
+if [str(row.get("id")) for row in rows] != [str(item.get("id")) for item in selected]:
+    raise SystemExit("resume subset prompt IDs differ from provenance")
+expected_refs = {str(item.get("reference_name")) for item in selected}
+actual_refs = {path.name for path in refs_path.iterdir() if path.is_file()}
+if actual_refs != expected_refs:
+    raise SystemExit("resume subset reference set mismatch")
+print(f"[verify] resume subset rows={expected} prompts_sha256={prompt_sha}")
+PY
+}
+
 run_model() {
   local label="$1" checkpoint="$2"
   local model_out="${OUT_ROOT}/${label}"
@@ -350,6 +385,7 @@ resume_formal() {
       echo "resume subset is incomplete: ${OUT_ROOT}/subset" >&2
       return 1
     }
+  validate_resume_subset
   validate_gpus
   TMP_ROOT="$(mktemp -d /tmp/reca-gradient-ab-eval.XXXXXX)"
   exec > >(tee -a "${OUT_ROOT}/pipeline.log") 2>&1
