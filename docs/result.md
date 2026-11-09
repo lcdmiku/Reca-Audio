@@ -296,6 +296,292 @@ IS 7.71 → 6.21（变差），KL 2.196 → **2.002（变好）**，FD 43.83 →
 | 训练代码 | `src/reca_audio/train/` | 说明见 [reca_training.md](reca_training.md) |
 | 旧轮次产物 | 已删除 | 为省磁盘删除；日志仍在 `runs/train/reca_*/train_log.jsonl` |
 
+### 5.7 Matrix v1：Pure ReCA / T2A-only / Mix 1:1（2026-11-07）
+
+本轮从同一个原始 Audio-Omni checkpoint 出发，三组都训练 2000 step。训练集是按音频
+SHA256 分组后的 3530 行（707 个唯一音频）；内部 test 是 445 行（89 个唯一音频），与
+train/val 的 sample ID 和音频 SHA256 交集均为 0。`task_mode=mix` 每个 batch 只采样一个
+任务，最终实际计数为 ReCA 1004 / T2A 996，不是每个 batch 同时计算两项 loss。
+
+生成评测统一使用 100-step ODE、CFG=6、fp16、seed=1234，以及 3 个双卡 shard（GPU
+0--5）。所有模型使用相同 prompts、分片和 seed 规则；8 个 case 均无生成失败。
+
+**AudioCaps held-out（445 条，越低：FAD/KL/FD；越高：IS/CLAP）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | **0.3514** | 2.1666 | **7.0272** | 64.0793 | **0.4610** |
+| Pure ReCA | 0.3839 | 2.0406 | 6.1474 | **61.2357** | 0.4310 |
+| T2A-only | 0.4287 | 2.0330 | 5.8390 | 65.1342 | 0.3945 |
+| Mix 1:1 | 0.4277 | **2.0213** | 5.9148 | 61.8488 | 0.3894 |
+
+**MusicCaps（1004 条）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | 0.3238 | 1.3412 | 3.4425 | 18.5154 | 0.3882 |
+| Pure ReCA | 0.2723 | 1.3633 | 3.5994 | 17.5523 | 0.4117 |
+| T2A-only | 0.3208 | **1.2922** | 3.2923 | 18.7068 | 0.4135 |
+| Mix 1:1 | **0.2611** | 1.3843 | **3.6931** | **16.2328** | **0.4147** |
+
+**Held-out reconstruction 诊断（24 条）**
+
+该诊断严格匹配训练数据通路：目标为原始 5 秒音频；Qwen 输入先从 16 kHz 降到 4 kHz
+再升回 16 kHz；`audio_input_prompt` 仍是模型固定要求的 10 秒静音；采样 100 step、
+CFG=1。24 条是 held-out test 中确定性排序后的前 24 条，因此只用于模型间配对诊断，
+不作为总体 benchmark 置信区间。
+
+| 模型 | 配对 CLAP cosine ↑ | CLAP-FAD ↓ | LSD ↓ |
+|---|---:|---:|---:|
+| Base | 0.1483 ± 0.1477 | 1.3833 | 63.0893 |
+| Pure ReCA | **0.2160 ± 0.1205** | **1.3465** | 61.7886 |
+| T2A-only | 0.1585 ± 0.1274 | 1.4005 | **60.9439** |
+| Mix 1:1 | 0.1950 ± 0.1333 | 1.3675 | 61.5467 |
+
+**源码事实与可支持的结论：**
+
+- Pure 和 Mix 的配对 CLAP reconstruction 都高于 Base，说明 reconstruction alignment
+  确实发生；Mix 的 alignment 弱于 Pure，符合它只有约一半 ReCA 更新。
+- 在 AudioCaps held-out 上，Pure 的 CLAP-FAD 更高、IS/CLAP 更低；Mix 不但没有保护
+  文本条件能力，CLAP 还比 Pure 更低。因此“1:1 T2A replay 足以阻止破坏”的假设被否定。
+- T2A-only 同样在 AudioCaps held-out 上明显退化，说明问题不能只归因于 audio hidden
+  states 的 acoustic shortcut；全量 DiT 持续训练造成的参数漂移、训练分布重复和目标形式
+  也可能是主要因素。
+- MusicCaps 上 Pure/Mix 出现相反的正迁移，Mix 在除 KL 外的四项指标最佳。因此本轮不是
+  “生成能力整体下降”，而是明显的域依赖 trade-off；不能用单一 AudioCaps 或训练 loss
+  概括整体能力。
+- 下一组最小实验应优先约束相对 Base 的参数漂移（更低 LR/更短训练、L2-SP/teacher
+  distillation，或仅训练 cross-attention/projection），而不是只继续提高 T2A batch 比例。
+
+产物：
+
+- 生成结果：`runs/Benchmark/output/Matrix_v1_eval3_6gpu_9ce3984/`
+- 重建诊断：`runs/Benchmark/output/Reconstruction_v4_6gpu_9ce3984/`
+- 训练日志：`runs/train/reca_matrix_v1/{pure,t2a,mix}/train_log.jsonl`
+
+### 5.8 Gradient accumulation 受控实验：单测、smoke 与静态诊断（2026-11-07）
+
+本阶段只验证诊断和等曝光 A/B 基础设施，**尚未启动 400 micro-batch A/B**。统一 LR
+曲线按 micro-batch 曝光量索引：总曝光 400、warmup 20、peak LR `2e-5`；B 每次 update
+使用四个曝光位置 LR 的平均值。Adafactor 的 `relative_step=False`、
+`scale_parameter=False`，内部没有 relative-step 调度。
+
+本地 23 项聚焦测试通过。服务器 smoke 使用同一份 4-record schedule（SHA256
+`67f8c82f...eedc6`），A 完成 4 次 update，B 完成 1 次 update：
+
+| Arm | 曝光 | updates | 实际 LR | pre-clip grad norm | 全局 drift（曝光 4） |
+|---|---:|---:|---|---|---:|
+| A / accum 1 | 4 | 4 | 2e-5 / 1.5e-5 / 5e-6 / 0 | 2.455 / 1.960 / 2.214 / 2.832 | 0.002328 |
+| B / accum 4 | 4 | 1 | **1.0e-5**（四位置均值） | 1.222 | 0.000942 |
+
+所有 smoke update 的 pre-clip norm 都大于阈值 1，因此都触发 gradient clipping。两臂
+均完成 exposure 0/4 固定诊断；checkpoint 保存、reload 校验成功并立即删除，没有保留
+smoke 权重。smoke 只用 1 个诊断样本，variance 必然为 0，不能用于判断 accumulation
+是否降低方差。
+
+原始 checkpoint 的正式静态诊断使用 held-out test 前 8 个样本，同一音频分别计算
+ReCA/T2A 梯度，不创建 optimizer、没有 `optimizer.step()`：
+
+| 指标 | ReCA | T2A |
+|---|---:|---:|
+| mean loss | 1.01485 | 1.00109 |
+| mean sample gradient norm | 3.52132 | 3.66839 |
+| mean gradient norm | 1.43977 | 1.64179 |
+| gradient variance trace | 13.48325 | 17.49572 |
+
+同一样本 ReCA/T2A 梯度 cosine 的均值为 **0.74650**，8 个样本上整体为正，因此在原始
+checkpoint 处没有观察到强烈的全局反向冲突；但这不能推出训练过程中始终无冲突。
+逐 block cosine 呈明显深度结构：早中层最低的是 layer 5（0.527）、layer 3（0.556）、
+layer 6（0.563），后层 layer 30--35 大约为 0.91--0.94。ReCA/T2A 的归一化方差量级
+接近（全局约 6.5 倍 mean-gradient squared norm），说明小 batch 的样本梯度噪声很大，
+但仅凭静态结果还不能证明 accumulation=4 会改善最终 T2A。
+
+产物：
+
+- smoke：`runs/train/reca_gradient_ab_smoke_02cf985/`
+- 静态诊断：`runs/train/reca_gradient_static_02cf985/static/metrics.jsonl`
+- 两处均无模型权重；完成后 `/home/linchudeng` 仍约 350G。
+
+### 5.9 Equal-exposure A/B：accumulation 1 vs 4（2026-11-07）
+
+正式小规模实验消费同一份 400-record schedule（SHA256
+`daf5abc2...119298`），实际任务数为 ReCA 211 / T2A 189。A 使用 accumulation 1、
+执行 400 次 optimizer update；B 使用 accumulation 4、执行 100 次 update。因此这是
+**相同数据预算下不同优化制度**的比较，不是相同 update 数的比较。
+
+合同和产物检查均通过：固定诊断位于 exposure 0/100/200/400；checkpoint 对应 A 的
+step 100/200/400 和 B 的 step 25/50/100，均成功 reload。中间 checkpoint 已删除，只保留
+exposure 400 最终权重。
+
+**训练更新稳定性**
+
+| Arm | update 数 | pre-clip norm 均值 | norm variance | norm CV | clipping rate | 平均 clip scale |
+|---|---:|---:|---:|---:|---:|---:|
+| A / accum 1 | 400 | 2.1728 | 0.7526 | 0.3993 | 99.75% | 0.5145 |
+| B / accum 4 | 100 | **1.1859** | **0.1122** | **0.2825** | **66.0%** | **0.8596** |
+
+B 的 update-norm variance 比 A 低约 85%，CV 低约 29%，并把裁剪率从 99.75% 降到
+66%。因此 accumulation 4 明显减少了实际 optimizer update 的幅度波动和 clipping
+饱和；这支持增大 effective batch 用于后续训练稳定性，但其中也包含“四个梯度先平均”
+这一机制本身，不能解释为数据分布噪声消失。
+
+**固定 held-out 诊断（8 条）**
+
+| Exposure | Arm | ReCA loss | T2A loss | ReCA variance | T2A variance | R/T cosine | global drift |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 0 | A/B | 1.01485 | 1.00109 | 13.483 | 17.496 | 0.7465 | 0 |
+| 100 | A | 1.00364 | 0.99949 | 8.139 | 7.743 | 0.8348 | 0.013512 |
+| 100 | B | **0.98170** | **0.98215** | 9.972 | 9.138 | 0.8218 | **0.007478** |
+| 200 | A | 1.00729 | 1.01051 | 5.752 | 8.781 | 0.8883 | 0.017012 |
+| 200 | B | **0.98775** | **0.98648** | **4.674** | **5.237** | 0.8704 | **0.009453** |
+| 400 | A | 0.98321 | 0.98402 | 4.407 | 4.555 | **0.8963** | 0.017635 |
+| 400 | B | **0.97995** | **0.97956** | **4.297** | **4.471** | 0.8897 | **0.009804** |
+
+两臂的绝对固定批次 variance 都随梯度整体变小而下降；但以 mean-gradient norm²
+归一化后，最终 ReCA/T2A variance 分别为 A 的 6.64/6.89、B 的 7.00/6.92，B 并没有
+降低相对样本梯度方差。因此需要区分：**B 明显稳定了四样本平均后的 update，但没有证据
+表明单样本梯度分布本身变得更一致。**
+
+ReCA/T2A cosine 全程为正，且 A/B 都从 0.7465 上升到约 0.89，不支持“两个任务发生
+全局反向梯度冲突”。冲突/差异主要集中在早中层；最终最低仍是 layer 5（A 0.661、
+B 0.610）以及 layer 2--6。参数漂移最大则集中在 layer 30--35，其次是 layer 0--2。
+
+B 最终 global drift 为 0.009804，比 A 的 0.017635 低约 44%。同时 B 的固定 T2A flow
+loss 不劣于 A，但该 loss 不是 T2A 生成指标；在对两个最终 checkpoint 运行相同 T2A
+生成 benchmark 前，不能推出 B 保留了更多文本生成能力，也不能建立 drift 与 AudioCaps
+指标下降之间的相关性。
+
+产物：
+
+- `runs/train/reca_gradient_ab_v1/a/dit_exposure0400.pt`（约 12.16 GB）
+- `runs/train/reca_gradient_ab_v1/b/dit_exposure0400.pt`（约 12.16 GB）
+- `runs/train/reca_gradient_ab_v1/{a,b}/metrics.jsonl`
+- 完成后 `/home/linchudeng` 约 373G，GPU 与实验进程均已释放。
+
+### 5.10 Equal-exposure A/B：89-clip held-out T2A（2026-11-08）
+
+为回答“更稳定、漂移更小的 accumulation 4 是否保留更多文本生成能力”，从 SHA 隔离的
+AudioCaps test 分区按 manifest 首次出现顺序，每个唯一音频 SHA256 只保留一条 caption，
+得到 89 条确定性诊断集。prompt manifest SHA256 为
+`006c0fbb...1a2401e`；Base/A/B 共用 prompt 顺序、分片和 seed。生成统一使用 100-step
+ODE、CFG=6、10 秒、fp16、seed=1234，以及 GPU 1--6 上的三个双卡 shard。
+
+A/B 都是同一条 400-micro-batch Mix 序列（ReCA 211 / T2A 189）训练出的 checkpoint，
+不是 Pure ReCA。A 执行 400 次 accumulation-1 update；B 执行 100 次 accumulation-4
+update。两者数据曝光量相同，但 optimizer update 数不同。
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | **0.42515** | 2.19518 | **6.84548** | **70.65282** | **0.46226** |
+| A / accum 1 | 0.52285 | 2.27633 | 6.47920 | 80.23866 | 0.39179 |
+| B / accum 4 | 0.46687 | **2.13032** | 6.37711 | 77.04059 | 0.44044 |
+
+相对 Base，A 的 CLAP 下降 0.07047、CLAP-FAD 增加 0.09770；B 的 CLAP 只下降
+0.02181、CLAP-FAD 增加 0.04172。B 相对 A 的 CLAP 提高 0.04865，并将相对 Base 的
+CLAP 损失缩小约 69%；CLAP-FAD、KL 和 FD 也都优于 A，但 IS 比 A 低 0.10209。因此
+accumulation 4 并非所有指标一致占优，且 89 条上的分布指标方差较大。
+
+**可支持的结论：**
+
+- 在相同 400 次数据曝光下，B 的 update 更稳定、global drift 更低，同时 T2A CLAP
+  明显更接近 Base；方向上支持“限制参数漂移有助于保留文本条件能力”。
+- B 仍未恢复 Base：CLAP 低 0.02181，CLAP-FAD 和 FD 仍更差。因此增大 effective
+  batch 只能缓解、不能消除短程 Mix 后训练的 catastrophic interference。
+- B 的 KL 优于 Base，但 IS/FD/CLAP 没有同步改善；不能把单个分布指标解释为 T2A
+  整体变好。
+- 这里只有 A/B 两个训练制度，且 update 数也不同，不能建立 drift 与指标的统计相关性，
+  也不能把差异唯一归因于“梯度方差降低”。
+- 结果支持下一步在 accumulation 4 下单独测试更低 peak LR，而不是立刻启动长训练。
+
+运行过程中先由 Linux dry-run 发现 Bash 特殊变量 `SECONDS` 会使输出时长漂移，正式运行
+前改为 `AUDIO_SECONDS=10`。Base 首次评分又因未导出 `CLAP_CKPT` 而尝试联网下载并失败；
+89 条 Base 音频完整保留，随后使用本地 1.8 GB CLAP 与 313 MB PANNs 缓存、offline 模式
+断点续跑，没有重复生成 Base。最终三组均为 89/89，无残留 `/tmp` 合并 checkpoint。
+
+产物：
+
+- 评测：`runs/Benchmark/output/GradientAB_T2A_89_fc1a3eb/`（约 495 MB）
+- Base/A/B 指标：各自子目录的 `results.json`
+- 子集 provenance：`subset/selection.json` 与 `run_contract.json`
+- 实际断点续跑版本：`182d9a2`；最终 hardened 启动器部署版本：`d55227a`
+- A/B DiT checkpoint 各约 12 GB，继续保留；完成后用户目录仍约 373G。
+
+### 5.11 2000-exposure 长训练：Pure / T2A / Mix，accumulation 4（2026-11-09）
+
+本轮从同一个原始 Audio-Omni checkpoint 出发，固定 micro batch 1、gradient
+accumulation 4、Adafactor、fp16、peak LR `2e-5`，每组均消费 2000 个 micro-batch、
+执行 500 次 optimizer update。LR 按累计曝光量索引，warmup 为 100 exposures（5%），
+之后 cosine 衰减。三组分别为 Pure ReCA、T2A-only 和严格 1:1 Mix（1000 ReCA +
+1000 T2A）；checkpoint 均通过保存、加载与续训校验。与旧 Matrix v1 相比，本轮只改变
+优化制度为 accumulation 4，评测协议、初始 checkpoint、训练数据和主要超参数保持一致。
+
+训练 loss 在 2000 exposures 内基本平坦，不能据此判断生成质量。最终 global drift 分别为
+Pure 0.02066、T2A 0.02048、Mix 0.02063；固定诊断的 ReCA/T2A gradient cosine 分别为
+0.8975、0.9077、0.9212，仍未观察到全局反向梯度冲突。三组 clipping rate 为
+54.4%、56.0%、53.6%，明显低于旧 accumulation-1 制度中接近饱和的裁剪状态。
+
+**AudioCaps held-out（445 条；FAD/KL/FD 越低越好，IS/CLAP 越高越好）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | **0.3514** | 2.1666 | **7.0272** | 64.0793 | **0.4610** |
+| Pure / accum 4 | 0.3879 | 2.0925 | 6.5098 | **63.3541** | 0.4458 |
+| T2A / accum 4 | 0.4230 | **2.0003** | 6.0688 | 63.4938 | 0.4161 |
+| Mix / accum 4 | 0.4144 | 2.1320 | 6.7433 | 65.1191 | 0.4211 |
+
+相对旧 accumulation-1 Matrix，Mix 的 CLAP 从 0.3894 提升到 0.4211、IS 从
+5.9148 提升到 6.7433，CLAP-FAD 从 0.4277 改善到 0.4144，说明 accumulation 4
+确实缓解了 AudioCaps 上的文本能力破坏；但 KL/FD 并非同步改善，且 Mix 仍未恢复 Base。
+T2A-only 也低于 Base，进一步说明退化不能只归因于 audio-conditioned acoustic shortcut。
+
+**MusicCaps（1004 条）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | 0.3238 | 1.3412 | 3.4425 | 18.5154 | 0.3882 |
+| Pure / accum 4 | **0.2811** | 1.3489 | **3.5550** | **16.2442** | **0.4086** |
+| T2A / accum 4 | 0.3239 | **1.2851** | 3.2600 | 18.6235 | 0.3973 |
+| Mix / accum 4 | 0.2843 | 1.3032 | 3.3736 | 17.3386 | 0.4051 |
+
+MusicCaps 上 Pure/Mix 相对 Base 仍呈正迁移，但 accumulation 4 并未全面超过旧
+accumulation-1：旧 Mix 的 FAD/IS/FD/CLAP 更好，新 Mix 只有 KL 更好。这证实优化制度的
+收益具有域和指标依赖性，不能由 AudioCaps 单域结果外推。
+
+**Held-out reconstruction（24 条；同一 items、reference、5 秒目标、100 steps、CFG=1）**
+
+| 模型 | pair CLAP ↑ | CLAP-FAD ↓ | LSD ↓ |
+|---|---:|---:|---:|
+| Base | 0.1483 ± 0.1477 | 1.3833 | 63.0893 |
+| Pure / accum 4 | **0.1947 ± 0.1541** | **1.3677** | 61.7399 |
+| T2A / accum 4 | 0.1383 ± 0.1344 | 1.3963 | **60.8637** |
+| Mix / accum 4 | 0.1745 ± 0.1445 | 1.3937 | 61.8350 |
+
+Pure 和 Mix 的 pair CLAP 均高于 Base，证明本轮仍学到了 audio-conditioned
+reconstruction alignment；Pure 强于 Mix，符合 Mix 只有一半 ReCA 曝光。但它们弱于旧
+accumulation-1 的 Pure 0.2160 / Mix 0.1950，说明更稳定、更少 update 的制度同时减弱了
+alignment 强度。T2A-only 的 pair CLAP 低于 Base，符合它没有 ReCA supervision。
+
+这里所有重建统一输出固定 5 秒。底层静音 prompt/padding 决定时间框架和张量形状，可能
+影响结尾静音比例及长度相关指标；但四组共用同一长度协议，所以不会单独解释组间差异。
+它不等于模型学会了输入音频的自然时长，后续可变长度结论仍需单独实验。
+
+**本轮可支持的结论：**
+
+- accumulation 4 在 AudioCaps 上明显缓解 catastrophic interference，但不能消除；
+- Pure/Mix 的 reconstruction alignment 与 T2A 能力并非同步增强，存在清晰 trade-off；
+- 1:1 Mix 在本轮既不是 AudioCaps 最佳训练组，也不是 MusicCaps 最佳训练组，不能证明
+  简单 replay 足以完成 audio-to-text condition transfer；
+- Pure 在两个生成 benchmark 上都是本轮训练组中最强或接近最强，说明 ReCA 并非只会
+  复制输入，但 MusicCaps 正迁移与 AudioCaps 退化并存，仍不能宣称整体 T2A 改善；
+- 下一步应直接约束相对 Base 的更新范围或漂移，而不是只继续增加 batch 或 T2A 比例。
+
+产物：
+
+- checkpoint：`runs/train/reca_long_matrix_b_v1/{pure,t2a,mix}/dit_exposure2000.pt`
+- 生成评测：`runs/Benchmark/output/LongMatrixB_eval_v1/`
+- 重建评测：`runs/Benchmark/output/Reconstruction_LongMatrixB_v1/`
+- 一次性合并 checkpoint 已清理；完成后 `/home/linchudeng` 约 296G。
+
 ## 6. 状态总览
 
 | Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
@@ -304,7 +590,7 @@ IS 7.71 → 6.21（变差），KL 2.196 → **2.002（变好）**，FD 43.83 →
 | MMAU | ✅ test-mini 1000 | 57.70 % | 63.30 | 子集 + 提示词不同 |
 | AudioCaps | ✅ 1000 条（T2A） | CLAP-FAD 0.2230 / KL 2.196 / IS 7.706 / FD 43.83 / CLAP 0.4575 | FAD 1.86 | 数据子集 + 嵌入不同，不可比 |
 | MusicCaps | ✅ 1004 条（T2M） | CLAP-FAD 0.3140 / KL 1.325 / IS 3.386 / FD 18.55 / CLAP 0.3909 | FAD 1.94 | 同上 |
-| ReCA 后训练 | ⚠️ 修复 bug 后重训 b6 | b6：CLAP-FAD 0.2533 / KL 2.002 / IS 6.215 / FD 44.51 / CLIP 0.4166（基线 0.2230 / 2.196 / 7.706 / 43.83 / 0.4575，除 KL 外均变差） | — | 自建协议，见第 5 节 |
+| ReCA 后训练 | ✅ Pure/T2A/Mix 各 2000 exposures | AudioCaps：Pure CLAP 0.4458、Mix 0.4211（Base 0.4610）；MusicCaps：Pure CLAP 0.4086、Mix 0.4051（Base 0.3882） | — | 自建 held-out 协议，见 5.11 |
 
 ## 7. 复现命令
 
@@ -337,9 +623,12 @@ bash runs/Benchmark/run_shards.sh --benchmark MMAU
 
 ## 9. 下一步
 
-1. **ReCA 混合训练**：b6 已验证纯重建（λ_T2A=0）会让 T2A 变差（FAD +0.030、CLIP −0.041），
-   下一步按 `TASK_MODE=mix LAMBDA_T2A=1` 重跑，验证“重建 + 文本各半”能否兼顾（代码已支持，未实跑）；
-2. 若混合仍无收益，改为**只训部分参数**（如 cross-attn 投影层）做轻量对齐；
-3. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）；
-4. 用官方 inference 提示词重跑 MMSU/MMAU（若能拿到），消除提示词差异；
-5. 用 b6（修复 `<|AUDIO|>` 后重训）的结果替换第 5 节中作废的旧轮次。
+1. 保留本轮三个 checkpoint 作为正式对照；下一轮只改变一个因素，优先做**部分参数训练**
+   （projection + conditioning/cross-attention）的小规模 Pure/Mix 诊断，验证能否保留 Base
+   文本通路并继续获得 reconstruction alignment；
+2. 若现有参数命名无法可靠隔离 conditioning 参数，先做 accumulation 4、peak LR
+   `1e-5` 的 400-exposure 小实验，作为更低漂移的单变量替代，不直接再跑 2000 exposures；
+3. 候选方案必须同时通过固定 reconstruction 24 条和 AudioCaps 89 条快速门槛，再进入
+   AudioCaps 445 条与 MusicCaps 1004 条正式评测；
+4. 增加可变长度/尾部静音诊断，区分固定 5 秒 padding 带来的长度先验与真正的内容重建；
+5. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）。

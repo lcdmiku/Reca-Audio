@@ -189,6 +189,37 @@ target = noise - latents
 修正后训练 600 步：重建频谱平坦度 **0.026 / 0.069 / 0.073**（三个种子，原始 0.032），
 训练 loss 从 1.05 稳定在 ~1.0，不再塌缩。
 
+## Gradient stability controlled experiment（2026-11-07）
+
+独立入口 `reca_audio.train.run_gradient_ab` 用于等 micro-batch 曝光量的 accumulation
+对照，不改变正式训练循环。两组读取同一个带 SHA256 的预生成 JSONL 序列，序列固定
+sample index、ReCA/T2A task、数据裁剪 seed、Prompt seed 和 flow seed。
+
+- A：micro-batch 1、accumulation 1；400 次曝光对应 400 次 update。
+- B：micro-batch 1、accumulation 4；400 次曝光对应 100 次 update。
+- LR 按一基曝光位置索引：前 20/400 次线性 warmup 到 `2e-5`，随后 cosine 衰减；
+  B 的 update LR 是对应四个曝光位置 LR 的算术平均。
+- Adafactor 显式使用 `relative_step=False`、`scale_parameter=False`，不存在内部 LR
+  调度与外部曝光量曲线叠加。
+- 正式 `run` 需要显式设置 `ALLOW_FORMAL=1`；否则 launcher 拒绝启动。
+
+```bash
+# 4 次曝光 smoke；A=4 updates，B=1 update
+OUT_ROOT=runs/train/reca_gradient_ab_smoke bash runs/scripts/train_reca_gradient_ab.sh smoke
+
+# 原始 checkpoint 上 8 个 held-out 样本的静态梯度诊断；无 optimizer.step
+OUT_ROOT=runs/train/reca_gradient_static bash runs/scripts/train_reca_gradient_ab.sh static
+
+# 400 次曝光正式 A/B（必须在 smoke 后另行确认）
+ALLOW_FORMAL=1 OUT_ROOT=runs/train/reca_gradient_ab_v1 \
+  bash runs/scripts/train_reca_gradient_ab.sh run
+```
+
+诊断记录 ReCA/T2A loss、全局及逐 block gradient norm/variance/cosine、裁剪比例、参数
+相对 L2 drift、实际 LR 与累计曝光量。固定诊断通过 `autograd.grad` 执行，并恢复 RNG，
+不修改 optimizer/scaler 或模型参数。checkpoint 会保存并 reload 校验；smoke 和正式运行的
+中间权重随即删除，正式 A/B 各只保留 exposure 400 最终 checkpoint 供后续 T2A 评测。
+
 ## 用法
 
 ```bash
