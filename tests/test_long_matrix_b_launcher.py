@@ -15,7 +15,8 @@ def test_launcher_pins_exact_b_training_contract():
     assert 'WARMUP=100' in text
     assert '--peak-lr 2e-5' in text
     assert '--arm b' in text
-    assert '--seconds 5' in text
+    assert 'CLIP_SECONDS="${CLIP_SECONDS:-5}"' in text
+    assert '--seconds "${CLIP_SECONDS}"' in text
     assert '--task-mode "${task_mode}"' in text
     assert 'prepare_schedule pure pure' in text
     assert 'prepare_schedule t2a t2a' in text
@@ -48,6 +49,6 @@ def test_launcher_smoke_is_sequential_and_keeps_only_final_checkpoint():
     assert 'WARMUP=1' in text
     assert '--save-exposures "${TOTAL}"' in text
     assert '--keep-final-checkpoint' in text
-    assert 'run_smoke_arm pure pure' in text
-    assert 'run_smoke_arm t2a t2a' in text
-    assert 'run_smoke_arm mix balanced_mix' in text
+    assert 'SMOKE_ARMS="${SMOKE_ARMS:-pure t2a mix}"' in text
+    assert 'for arm in ${SMOKE_ARMS}; do' in text
+    assert 'run_smoke_arm "${arm}" "${task_modes[${arm}]}"' in text
