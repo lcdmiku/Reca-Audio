@@ -12,6 +12,8 @@ DIAGNOSTIC_MANIFEST="${DIAGNOSTIC_MANIFEST:-${SPLIT_ROOT}/test_manifest.jsonl}"
 CKPT="${CKPT:-Audio-Omni/model/model.ckpt}"
 GPU_PAIRS="${GPU_PAIRS:-0,1 2,3 4,5}"
 SEED="${SEED:-42}"
+CLIP_SECONDS="${CLIP_SECONDS:-5}"
+SMOKE_ARMS="${SMOKE_ARMS:-pure t2a mix}"
 
 status() {
   local arm pid state
@@ -111,7 +113,7 @@ run_arm() {
     --allow-formal \
     --model-config "${REPO_ROOT}/Audio-Omni/model/Audio-Omni.json" \
     --ckpt "${CKPT}" \
-    --seconds 5 \
+    --seconds "${CLIP_SECONDS}" \
     --device cuda:0 \
     --conditioner-device cuda:1 \
     --vae-device cpu \
@@ -167,18 +169,24 @@ esac
 activate_environment
 mkdir -p "${OUT_ROOT}"
 
-prepare_schedule pure pure
-prepare_schedule t2a t2a
-prepare_schedule mix balanced_mix
-
 read -r -a pairs <<<"${GPU_PAIRS}"
+declare -A task_modes=([pure]=pure [t2a]=t2a [mix]=balanced_mix)
 if [[ "${ACTION}" == "smoke" ]]; then
-  run_smoke_arm pure pure "${pairs[0]}"
-  run_smoke_arm t2a t2a "${pairs[0]}"
-  run_smoke_arm mix balanced_mix "${pairs[0]}"
+  for arm in ${SMOKE_ARMS}; do
+    [[ -n "${task_modes[${arm}]:-}" ]] || {
+      echo "unsupported smoke arm: ${arm}" >&2
+      exit 2
+    }
+    prepare_schedule "${arm}" "${task_modes[${arm}]}"
+    run_smoke_arm "${arm}" "${task_modes[${arm}]}" "${pairs[0]}"
+  done
   echo "completed smoke: ${OUT_ROOT}"
   exit 0
 fi
+
+prepare_schedule pure pure
+prepare_schedule t2a t2a
+prepare_schedule mix balanced_mix
 
 declare -a pids=()
 declare -a arms=(pure t2a mix)
