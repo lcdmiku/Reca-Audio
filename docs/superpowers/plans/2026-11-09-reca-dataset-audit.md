@@ -58,4 +58,3 @@
 - [ ] Verify row/audio counts, SHA intersections, schedule coverage, CLAP score distributions, and cleanup of temporary crops.
 - [ ] Copy the generated report/problem list to durable project documentation and record artifact paths.
 - [ ] Run `git diff --check` and focused tests, then commit the report.
-

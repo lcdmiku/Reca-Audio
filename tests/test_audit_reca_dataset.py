@@ -152,4 +152,3 @@ def test_alignment_summary_separates_original_label_quality_from_crop_drop():
     assert summary["crop_drop_over_0_15"] == 1
     assert summary["sequential"]["n"] == 1
     assert summary["non_sequential"]["n"] == 2
-
