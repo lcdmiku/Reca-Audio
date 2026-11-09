@@ -180,17 +180,32 @@ def _audio_inventory(rows: Sequence[dict[str, Any]]) -> tuple[list[dict[str, Any
             inventory.append({"resolved_audio": path_text, "error": repr(exc)})
 
     good = [row for row in inventory if not row.get("error")]
+    good_by_sha = {row["sha256"]: row for row in good}
+    unique_good = list(good_by_sha.values())
     summary = {
-        "files": len(inventory),
-        "readable": len(good),
+        "paths": len(inventory),
+        "readable_paths": len(good),
+        "unique_sha256": len(unique_good),
         "sample_rates": dict(sorted(Counter(row["sample_rate"] for row in good).items())),
         "channels": dict(sorted(Counter(row["channels"] for row in good).items())),
         "duration_seconds": _distribution([row["duration_seconds"] for row in good]),
+        "unique_sha_duration_seconds": _distribution([row["duration_seconds"] for row in unique_good]),
         "rms_dbfs": _distribution([row["rms_dbfs"] for row in good]),
+        "unique_sha_rms_dbfs": _distribution([row["rms_dbfs"] for row in unique_good]),
         "silent_100ms_fraction": _distribution([row["silent_100ms_fraction"] for row in good]),
-        "shorter_than_5s": sum(row["duration_seconds"] < 5.0 for row in good),
-        "near_silent": sum(row["rms_dbfs"] < -45.0 for row in good),
-        "clipped_over_0_1pct": sum(row["clipped_fraction"] > 0.001 for row in good),
+        "unique_sha_silent_100ms_fraction": _distribution([row["silent_100ms_fraction"] for row in unique_good]),
+        "path_issue_counts": {
+            "shorter_than_5s": sum(row["duration_seconds"] < 5.0 for row in good),
+            "near_silent": sum(row["rms_dbfs"] < -45.0 for row in good),
+            "clipped_over_0_1pct": sum(row["clipped_fraction"] > 0.001 for row in good),
+            "more_than_half_silent": sum(row["silent_100ms_fraction"] > 0.5 for row in good),
+        },
+        "unique_sha_issue_counts": {
+            "shorter_than_5s": sum(row["duration_seconds"] < 5.0 for row in unique_good),
+            "near_silent": sum(row["rms_dbfs"] < -45.0 for row in unique_good),
+            "clipped_over_0_1pct": sum(row["clipped_fraction"] > 0.001 for row in unique_good),
+            "more_than_half_silent": sum(row["silent_100ms_fraction"] > 0.5 for row in unique_good),
+        },
     }
     return inventory, summary
 
@@ -216,6 +231,35 @@ def _distribution(values: Sequence[float]) -> dict[str, float | int | None]:
         "p95": quantile(0.95),
         "max": ordered[-1],
         "mean": statistics.fmean(ordered),
+    }
+
+
+def summarize_alignment(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    crop = [float(row["caption_crop_clap"]) for row in rows]
+    full = [float(row["caption_full_clap"]) for row in rows]
+    delta = [crop_score - full_score for crop_score, full_score in zip(crop, full)]
+    sequential = [
+        float(row["caption_crop_clap"])
+        for row in rows
+        if row.get("sequential_caption")
+    ]
+    non_sequential = [
+        float(row["caption_crop_clap"])
+        for row in rows
+        if not row.get("sequential_caption")
+    ]
+    crop_distribution = _distribution(crop)
+    return {
+        "exposures": len(rows),
+        "unique_sha256": len({row.get("sha256") for row in rows if row.get("sha256")}),
+        "crop_score": crop_distribution,
+        "full_score": _distribution(full),
+        "crop_minus_full": _distribution(delta),
+        "crop_drop_over_0_15": sum(value < -0.15 for value in delta),
+        "p05_problem_threshold": crop_distribution["p05"],
+        "below_p05": sum(value < float(crop_distribution["p05"]) for value in crop),
+        "sequential": _distribution(sequential),
+        "non_sequential": _distribution(non_sequential),
     }
 
 
@@ -308,19 +352,41 @@ def _clap_alignment(
             )
         audio_embeddings = np.concatenate(audio_embeddings)
         audio_embeddings /= np.linalg.norm(audio_embeddings, axis=1, keepdims=True) + 1e-8
-        scores = np.sum(audio_embeddings * text_embeddings, axis=1)
+        crop_scores = np.sum(audio_embeddings * text_embeddings, axis=1)
+
+        unique_full: dict[str, str] = {}
+        for row in schedule_rows:
+            key = str(row.get("sha256") or row["resolved_audio"])
+            unique_full.setdefault(key, row["resolved_audio"])
+        full_keys = list(unique_full)
+        full_embeddings = []
+        full_files = [unique_full[key] for key in full_keys]
+        for index in range(0, len(full_files), 32):
+            full_embeddings.append(
+                np.asarray(model.get_audio_embedding_from_filelist(x=full_files[index:index + 32], use_tensor=False))
+            )
+        full_embeddings = np.concatenate(full_embeddings)
+        full_embeddings /= np.linalg.norm(full_embeddings, axis=1, keepdims=True) + 1e-8
+        full_lookup = dict(zip(full_keys, full_embeddings))
+        scheduled_full = np.stack(
+            [full_lookup[str(row.get("sha256") or row["resolved_audio"])] for row in schedule_rows]
+        )
+        full_scores = np.sum(scheduled_full * text_embeddings, axis=1)
 
     output = []
-    for row, score in zip(schedule_rows, scores.tolist()):
-        output.append({**row, "caption_crop_clap": float(score), "sequential_caption": _sequential_caption(row["caption"])})
-    distribution = _distribution([row["caption_crop_clap"] for row in output])
-    threshold = float(distribution["p05"])
-    return output, {
-        "score": distribution,
-        "p05_problem_threshold": threshold,
-        "below_p05": sum(row["caption_crop_clap"] < threshold for row in output),
-        "sequential_caption_exposures": sum(row["sequential_caption"] for row in output),
-    }
+    for row, crop_score, full_score in zip(
+        schedule_rows, crop_scores.tolist(), full_scores.tolist()
+    ):
+        output.append(
+            {
+                **row,
+                "caption_crop_clap": float(crop_score),
+                "caption_full_clap": float(full_score),
+                "crop_minus_full_clap": float(crop_score - full_score),
+                "sequential_caption": _sequential_caption(row["caption"]),
+            }
+        )
+    return output, summarize_alignment(output)
 
 
 def _problems(
@@ -344,11 +410,16 @@ def _problems(
             problems.append({"scope": "audio", "issues": ";".join(issues), **row})
     if threshold is not None:
         for row in alignment:
+            issues = []
             if row["caption_crop_clap"] < threshold:
+                issues.append("bottom_5pct_caption_crop_clap")
+            if row.get("crop_minus_full_clap", 0.0) < -0.15:
+                issues.append("crop_clap_drop_over_0.15")
+            if issues:
                 problems.append(
                     {
                         "scope": "scheduled_crop",
-                        "issues": "bottom_5pct_caption_crop_clap",
+                        "issues": ";".join(issues),
                         **row,
                     }
                 )
@@ -364,10 +435,10 @@ def _markdown_report(summary: dict[str, Any], problems: Sequence[dict[str, Any]]
         f"- Source rows: {manifests['source']['rows']}",
         f"- Unique source paths / SHA256: {manifests['source']['unique_paths']} / {manifests['source']['unique_sha256']}",
         f"- Train/val/test rows: {manifests['train']['rows']} / {manifests['val']['rows']} / {manifests['test']['rows']}",
-        f"- Readable audio: {audio['readable']} / {audio['files']}",
+        f"- Readable paths / unique SHA256: {audio['readable_paths']} / {audio['unique_sha256']}",
         f"- Duration distribution: `{json.dumps(audio['duration_seconds'], ensure_ascii=False)}`",
         f"- RMS dBFS distribution: `{json.dumps(audio['rms_dbfs'], ensure_ascii=False)}`",
-        f"- Hard/problem records: {len(problems)}",
+        f"- Problem records / unique SHA256: {len(problems)} / {summary['problem_unique_sha256']}",
         "",
         "## Schedule coverage",
         "",
@@ -471,6 +542,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "benchmark_intersections": intersections,
         "caption_crop_alignment": alignment_summary,
         "problem_counts": dict(sorted(Counter(row["issues"] for row in problems).items())),
+        "problem_unique_sha256": len({row.get("sha256") for row in problems if row.get("sha256")}),
     }
     _write_csv(output / "audio_inventory.csv", inventory)
     _write_csv(output / "problem_samples.csv", problems)

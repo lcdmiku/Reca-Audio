@@ -118,3 +118,38 @@ def test_schedule_audit_reproduces_exposure_crop_and_row_selection(tmp_path):
     assert summary["tasks"] == {"reca": 1, "t2a": 1}
     assert summary["unique_rows"] == 1
 
+
+def test_alignment_summary_separates_original_label_quality_from_crop_drop():
+    module = load_module()
+    rows = [
+        {
+            "sha256": "same",
+            "caption_crop_clap": 0.10,
+            "caption_full_clap": 0.40,
+            "sequential_caption": True,
+        },
+        {
+            "sha256": "same",
+            "caption_crop_clap": 0.50,
+            "caption_full_clap": 0.55,
+            "sequential_caption": False,
+        },
+        {
+            "sha256": "other",
+            "caption_crop_clap": 0.60,
+            "caption_full_clap": 0.50,
+            "sequential_caption": False,
+        },
+    ]
+
+    summary = module.summarize_alignment(rows)
+
+    assert summary["exposures"] == 3
+    assert summary["unique_sha256"] == 2
+    assert summary["crop_score"]["mean"] == pytest.approx(0.4)
+    assert summary["full_score"]["mean"] == pytest.approx(0.4833333333)
+    assert summary["crop_minus_full"]["min"] == pytest.approx(-0.3)
+    assert summary["crop_drop_over_0_15"] == 1
+    assert summary["sequential"]["n"] == 1
+    assert summary["non_sequential"]["n"] == 2
+
