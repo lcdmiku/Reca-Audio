@@ -582,6 +582,64 @@ alignment 强度。T2A-only 的 pair CLAP 低于 Base，符合它没有 ReCA sup
 - 重建评测：`runs/Benchmark/output/Reconstruction_LongMatrixB_v1/`
 - 一次性合并 checkpoint 已清理；完成后 `/home/linchudeng` 约 296G。
 
+### 5.12 固定完整 10 秒输入：Pure / T2A / Mix（2026-11-10）
+
+本轮验证单一假设：5 秒随机 crop 会破坏 10 秒 caption 与训练目标的内容对齐。除把训练
+输入从随机 5 秒 crop 改为固定完整 10 秒外，其余保持 5.11 的 B 制度不变：相同初始
+checkpoint、数据、任务序列、2000 exposures、accumulation 4、Adafactor、fp16、peak LR
+`2e-5`、100-exposure warmup 和按曝光量索引的 cosine 衰减。这里的“完整”指当前数据中
+固定的 10 秒样本，不代表已支持任意自然时长。
+
+**训练聚合（500 次 optimizer update）**
+
+| 输入 | Arm | 前 50 loss | 后 50 loss | pre-clip norm 均值 | clipping rate | 用时 |
+|---|---|---:|---:|---:|---:|---:|
+| 5 秒 | Pure | 1.0545 | 1.0345 | 1.0662 | 54.4% | 3.61 h |
+| 5 秒 | T2A | 1.0530 | 1.0360 | 1.0759 | 56.0% | 3.42 h |
+| 5 秒 | Mix | ReCA 1.0524 / T2A 1.0565 | ReCA 1.0493 / T2A 1.0220 | 1.0679 | 53.6% | 3.53 h |
+| 10 秒 | Pure | 1.0414 | 1.0199 | 0.8172 | 13.6% | 4.58 h |
+| 10 秒 | T2A | 1.0394 | 1.0215 | 0.8161 | 13.0% | 4.22 h |
+| 10 秒 | Mix | ReCA 1.0321 / T2A 1.0489 | ReCA 1.0291 / T2A 1.0124 | 0.8139 | 12.6% | 4.48 h |
+
+10 秒训练的平均梯度范数和裁剪率显著降低，且三臂行为一致；但 loss 是对更多时间位置
+求平均，梯度尺度也可能随目标长度改变，因此不能把该现象单独解释为“样本梯度方差下降”。
+10 秒使单次训练约慢 23%--27%。两种时长的 loss 都只小幅下降，仍不能据此推断 T2A。
+
+**AudioCaps held-out（445 条）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | **0.3514** | 2.1666 | 7.0272 | 64.0793 | **0.4610** |
+| Pure / 10 秒 | 0.3929 | 2.1854 | **7.1121** | 65.8939 | 0.4386 |
+| T2A / 10 秒 | **0.3810** | **2.1058** | 6.5465 | 65.3767 | 0.4310 |
+| Mix / 10 秒 | 0.3926 | 2.1212 | 6.6760 | **64.9978** | 0.4286 |
+
+相对对应的 5 秒训练，10 秒 T2A/Mix 的 CLAP 分别提高 0.0148/0.0075，CLAP-FAD
+分别改善 0.0420/0.0218；Pure 的 CLAP 则下降 0.0072，FD 也变差。三组仍全部低于
+Base 的 CLAP。这支持“crop-caption 错配会伤害包含文本监督的分支”，但不支持它是 Pure
+ReCA 文本迁移失败的主因。
+
+**MusicCaps（1004 条）**
+
+| 模型 | CLAP-FAD ↓ | KL ↓ | IS ↑ | FD ↓ | CLAP ↑ |
+|---|---:|---:|---:|---:|---:|
+| Base | 0.3238 | 1.3412 | **3.4425** | 18.5154 | 0.3882 |
+| Pure / 10 秒 | 0.2731 | **1.3088** | 3.4026 | 17.3206 | 0.3991 |
+| T2A / 10 秒 | 0.3045 | 1.2992 | 3.3514 | 17.9865 | 0.3998 |
+| Mix / 10 秒 | **0.2582** | 1.3151 | 3.4415 | **16.7691** | **0.4057** |
+
+10 秒 Mix 是本轮综合最强的 MusicCaps 配置：相对 5 秒 Mix，CLAP-FAD 改善 0.0262、
+FD 改善 0.5695、CLAP 基本保持（+0.0005）。Pure 的 CLAP 相对 5 秒下降 0.0095，
+再次说明保留完整 caption 对应音频并不会自动解决 audio-conditioned 到 text-conditioned
+的迁移；acoustic shortcut、condition distribution gap 和原文本能力干扰仍需单独处理。
+
+**结论：** 固定完整 10 秒是值得保留的数据修正，尤其改善 T2A/Mix 的 AudioCaps 对齐，
+但它不是 ReCA 迁移机制的充分解。当前最合理的候选是 10 秒 Mix，而非 10 秒 Pure；下一组
+单变量实验应在保持 10 秒输入的前提下改变 ReCA/T2A 比例或限制可训练参数，不再重复比较
+5 秒 crop。评测目录为 `runs/Benchmark/output/LongMatrixB_10s_eval_v1/`，checkpoint 位于
+`runs/train/reca_long_matrix_b_10s_v1/{pure,t2a,mix}/dit_exposure2000.pt`。评测临时脚本和
+一次性合并 checkpoint 已清理；正式产物保留后用户目录约 338G。
+
 ## 6. 状态总览
 
 | Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
@@ -590,7 +648,7 @@ alignment 强度。T2A-only 的 pair CLAP 低于 Base，符合它没有 ReCA sup
 | MMAU | ✅ test-mini 1000 | 57.70 % | 63.30 | 子集 + 提示词不同 |
 | AudioCaps | ✅ 1000 条（T2A） | CLAP-FAD 0.2230 / KL 2.196 / IS 7.706 / FD 43.83 / CLAP 0.4575 | FAD 1.86 | 数据子集 + 嵌入不同，不可比 |
 | MusicCaps | ✅ 1004 条（T2M） | CLAP-FAD 0.3140 / KL 1.325 / IS 3.386 / FD 18.55 / CLAP 0.3909 | FAD 1.94 | 同上 |
-| ReCA 后训练 | ✅ Pure/T2A/Mix 各 2000 exposures | AudioCaps：Pure CLAP 0.4458、Mix 0.4211（Base 0.4610）；MusicCaps：Pure CLAP 0.4086、Mix 0.4051（Base 0.3882） | — | 自建 held-out 协议，见 5.11 |
+| ReCA 后训练 | ✅ 5 秒与完整 10 秒 Pure/T2A/Mix 各 2000 exposures | 10 秒 AudioCaps：Pure CLAP 0.4386、Mix 0.4286（Base 0.4610）；10 秒 MusicCaps：Pure 0.3991、Mix 0.4057（Base 0.3882） | — | 自建 held-out 协议，见 5.11--5.12 |
 
 ## 7. 复现命令
 
@@ -623,11 +681,11 @@ bash runs/Benchmark/run_shards.sh --benchmark MMAU
 
 ## 9. 下一步
 
-1. 保留本轮三个 checkpoint 作为正式对照；下一轮只改变一个因素，优先做**部分参数训练**
-   （projection + conditioning/cross-attention）的小规模 Pure/Mix 诊断，验证能否保留 Base
-   文本通路并继续获得 reconstruction alignment；
-2. 若现有参数命名无法可靠隔离 conditioning 参数，先做 accumulation 4、peak LR
-   `1e-5` 的 400-exposure 小实验，作为更低漂移的单变量替代，不直接再跑 2000 exposures；
+1. 保留 5 秒与 10 秒两轮 checkpoint 作为正式对照，并以 **10 秒 Mix** 作为下一轮数据与
+   优化基线；不再重复测试随机 5 秒 crop；
+2. 下一轮只改变一个因素：优先小规模测试更偏 T2A 的 ReCA/T2A 比例；或做**部分参数训练**
+   （projection + conditioning/cross-attention），验证能否保留 Base 文本通路并继续获得
+   reconstruction alignment。若参数命名无法可靠隔离，再以 peak LR `1e-5` 作为替代；
 3. 候选方案必须同时通过固定 reconstruction 24 条和 AudioCaps 89 条快速门槛，再进入
    AudioCaps 445 条与 MusicCaps 1004 条正式评测；
 4. 增加可变长度/尾部静音诊断，区分固定 5 秒 padding 带来的长度先验与真正的内容重建；
