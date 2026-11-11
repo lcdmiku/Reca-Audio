@@ -1,0 +1,59 @@
+import importlib.util
+from pathlib import Path
+
+import pytest
+import torch
+
+
+MODULE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "src"
+    / "reca_audio"
+    / "analysis"
+    / "condition_alignment.py"
+)
+
+
+def _module():
+    spec = importlib.util.spec_from_file_location("condition_alignment_under_test", MODULE_PATH)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_find_last_subsequence_mask_uses_last_occurrence():
+    mask = _module().find_last_subsequence_mask([1, 2, 3, 2, 3, 4], [2, 3])
+    assert mask.tolist() == [False, False, False, True, True, False]
+
+
+def test_masked_pool_rejects_empty_selection():
+    with pytest.raises(ValueError, match="empty"):
+        _module().masked_pool(torch.ones(3, 2), torch.zeros(3, dtype=torch.bool))
+
+
+def test_alignment_metrics_separates_matches_and_supports_multiple_captions():
+    module = _module()
+    audio = torch.tensor([[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0]])
+    text = torch.tensor(
+        [[1.0, 0.0], [0.9, 0.1], [0.0, 1.0], [-1.0, 0.0], [-0.9, 0.1]]
+    )
+    result = module.alignment_metrics(
+        audio,
+        text,
+        ["a", "b", "c"],
+        ["a", "a", "b", "c", "c"],
+        recall_ks=(1, 2),
+    )
+    assert result["cosine_margin"] > 0.9
+    assert result["audio_to_text"]["r@1"] == 1.0
+    assert result["text_to_audio"]["r@1"] == 1.0
+    assert result["linear_cka"] > 0.99
+
+
+def test_alignment_metrics_rejects_duplicate_audio_groups():
+    with pytest.raises(ValueError, match="unique"):
+        _module().alignment_metrics(
+            torch.eye(2), torch.eye(2), ["same", "same"], ["same", "same"]
+        )
+
