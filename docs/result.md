@@ -640,6 +640,46 @@ FD 改善 0.5695、CLAP 基本保持（+0.0005）。Pure 的 CLAP 相对 5 秒�
 `runs/train/reca_long_matrix_b_10s_v1/{pure,t2a,mix}/dit_exposure2000.pt`。评测临时脚本和
 一次性合并 checkpoint 已清理；正式产物保留后用户目录约 338G。
 
+### 5.13 Audio/Text condition distribution gap（2026-11-11）
+
+使用 SHA 隔离的 AudioCaps held-out 89 个唯一音频、445 条 caption，对完整 10 秒、4× 低通
+ReCA 音频条件与实际 T2A 文本条件做只读诊断。所有音频以内容 SHA 分组，每个音频保留
+5 条正 caption；未进行不同长度 token 的逐位置 cosine。指标包括匹配/非匹配 cosine、
+双向 Recall@1、linear CKA、RBF MMD 和 norm。Qwen/conditioner 全部冻结，不调用 VAE、
+flow loss 或 optimizer。
+
+协议检查通过：Qwen 返回 37 个 hidden-state 条目，当前源码实际取索引 35（`-2`）；每条
+音频固定包含 250 个 `<|AUDIO|>` token，文本侧为 0；audio/text semantic span 均无
+fallback。随机双向 R@1 均为 1.12%。
+
+**Content view（audio token vs caption token）**
+
+| Stage | margin | A→T R@1 | T→A R@1 | CKA | MMD ↓ |
+|---|---:|---:|---:|---:|---:|
+| Qwen layer 35 | 0.0098 | 12.36% | 7.19% | 0.5656 | 0.5991 |
+| Frozen projection | 0.1629 | 25.84% | 24.94% | **0.5999** | 0.3884 |
+| DiT Base | 0.1609 | 24.72% | 23.82% | 0.5721 | 0.4387 |
+| DiT Pure | **0.2064** | **33.71%** | 23.60% | 0.5851 | **0.3071** |
+| DiT T2A | 0.1707 | 24.72% | 23.60% | 0.5690 | 0.4140 |
+| DiT Mix | 0.1953 | 30.34% | **24.04%** | 0.5840 | 0.3448 |
+
+Qwen raw hidden 的 matched/unmatched cosine 非常接近，证明不能假设两模态天然同分布；
+但检索高于随机，说明仍有语义结构。冻结的 `2048→768` projection 将 margin 和双向检索
+显著提高，是当前跨模态对齐的关键边界。最终层 36 的 raw margin 最大，但层 35 的 CKA
+更高，且各层双向检索最优点不同，因此不能只按单一 margin 改 hidden layer。
+
+Pure/Mix 没有在 DiT `to_cond_embed` 处拉远两种模态，反而进一步提高 pooled margin、降低
+MMD；Pure 最强、Mix 次之。然而 AudioCaps CLAP 仍是 Base 0.4610 > Pure 0.4386 >
+T2A 0.4310 > Mix 0.4286，和条件对齐排序不一致。故 T2A 下降不能归因于 projection 或
+`to_cond_embed` 前的简单 distribution gap。更可能的失效位置是后续 cross-attention/block
+如何使用条件，或全 DiT 更新对原始文本去噪映射的干扰。该结果也不能排除 acoustic
+shortcut，因为池化检索无法检测音频 token 中的时间、音色和环境细节。
+
+完整报告：`docs/audits/2026-11-11-condition-alignment/analysis.md`；结构化结果和全层表为
+同目录的 `results.json`、`report.md`。服务器产物位于
+`runs/audits/condition_alignment_10s_sha_v1/`。下一步先用固定 latent/noise/timestep 捕获
+Base/Pure/Mix 逐 DiT block 的 cross-attention 与 predicted velocity 响应，不直接启动长训练。
+
 ## 6. 状态总览
 
 | Benchmark | 状态 | 本次结果 | 论文 | 可比性 |
@@ -683,10 +723,11 @@ bash runs/Benchmark/run_shards.sh --benchmark MMAU
 
 1. 保留 5 秒与 10 秒两轮 checkpoint 作为正式对照，并以 **10 秒 Mix** 作为下一轮数据与
    优化基线；不再重复测试随机 5 秒 crop；
-2. 下一轮只改变一个因素：优先小规模测试更偏 T2A 的 ReCA/T2A 比例；或做**部分参数训练**
-   （projection + conditioning/cross-attention），验证能否保留 Base 文本通路并继续获得
-   reconstruction alignment。若参数命名无法可靠隔离，再以 peak LR `1e-5` 作为替代；
-3. 候选方案必须同时通过固定 reconstruction 24 条和 AudioCaps 89 条快速门槛，再进入
+2. 在新训练前先做固定 latent/noise/timestep 的逐 DiT block 只读诊断，定位 audio/text
+   condition 在 cross-attention 或 predicted velocity 的哪一层开始分离；
+3. 根据逐层结果只改变一个训练因素：候选是 Base-text distillation、限制可训练 block，或
+   更偏 T2A 的任务比例；不能因 Qwen 最终层的单一 margin 更高就直接切换 hidden layer；
+4. 候选方案必须同时通过固定 reconstruction 24 条和 AudioCaps 89 条快速门槛，再进入
    AudioCaps 445 条与 MusicCaps 1004 条正式评测；
-4. 增加可变长度/尾部静音诊断，区分固定 5 秒 padding 带来的长度先验与真正的内容重建；
-5. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）。
+5. 增加可变长度/尾部静音诊断，区分固定 5 秒 padding 带来的长度先验与真正的内容重建；
+6. 补齐 **VGGish-FAD**（需要 torch.hub 的权重与源码，见 3.4；服务器访问不到 GitHub）。
