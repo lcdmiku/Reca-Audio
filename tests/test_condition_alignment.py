@@ -51,11 +51,12 @@ def test_group_manifest_rows_uses_audio_content_not_distinct_paths(tmp_path):
     rows = [
         {"audio": str(first), "caption": "caption one"},
         {"audio": str(second), "caption": "caption two"},
+        {"audio": str(second), "caption": "caption one"},
         {"audio": str(third), "caption": "caption three"},
     ]
     groups = _module().group_manifest_rows_by_audio_sha(rows)
     assert len(groups) == 2
-    assert groups[0]["captions"] == ["caption one", "caption two"]
+    assert groups[0]["captions"] == ["caption one", "caption two", "caption one"]
     assert groups[0]["row_index"] == 0
 
 

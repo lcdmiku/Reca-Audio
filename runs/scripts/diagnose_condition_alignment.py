@@ -61,6 +61,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--omni-seconds", type=float, default=0.0)
     parser.add_argument("--max-groups", type=int, default=0)
     parser.add_argument("--max-captions-per-group", type=int, default=5)
+    parser.add_argument("--expected-groups", type=int, default=0)
+    parser.add_argument("--expected-captions", type=int, default=0)
     parser.add_argument("--task", default="T2A")
     parser.add_argument("--reca-instruction", default=RECA_INSTRUCTION)
     parser.add_argument("--seed", type=int, default=42)
@@ -398,6 +400,14 @@ def main() -> int:
         for caption in item["captions"]
     ]
     text_group_ids = [group for group, _ in text_records]
+    if args.expected_groups and len(audio_group_ids) != args.expected_groups:
+        raise ValueError(
+            f"expected {args.expected_groups} audio groups, found {len(audio_group_ids)}"
+        )
+    if args.expected_captions and len(text_group_ids) != args.expected_captions:
+        raise ValueError(
+            f"expected {args.expected_captions} captions, found {len(text_group_ids)}"
+        )
 
     device = torch.device(args.device)
     cond_device = torch.device(args.conditioner_device)
@@ -498,6 +508,8 @@ def main() -> int:
             "dit_checkpoints": {name: str(path.resolve()) for name, path in specs.items()},
             "n_audio_groups": len(audio_group_ids),
             "n_text_captions": len(text_group_ids),
+            "expected_audio_groups": args.expected_groups,
+            "expected_text_captions": args.expected_captions,
             "seconds": args.seconds,
             "omni_downsample": args.omni_downsample,
             "omni_seconds": args.omni_seconds,

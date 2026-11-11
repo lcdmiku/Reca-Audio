@@ -66,9 +66,7 @@ def group_manifest_rows_by_audio_sha(
             }
         captions = grouped[group_id]["captions"]
         caption = str(row.get("caption") or row.get("prompt") or "audio").strip() or "audio"
-        if caption not in captions and (
-            max_captions_per_group <= 0 or len(captions) < max_captions_per_group
-        ):
+        if max_captions_per_group <= 0 or len(captions) < max_captions_per_group:
             captions.append(caption)
 
     selected = [item for item in grouped.values() if item["captions"]]
