@@ -24,6 +24,7 @@ import torch.nn.functional as F
 
 from reca_audio.analysis.condition_alignment import (
     alignment_metrics,
+    audio_payload_token_inventory,
     find_last_subsequence_mask,
     mask_from_token_ids,
     masked_pool,
@@ -142,10 +143,7 @@ def _token_ids(tokenizer: Any, text: str) -> list[int]:
 
 
 def _audio_token_inventory(tokenizer: Any) -> dict[str, int]:
-    vocab = tokenizer.get_vocab()
-    audio = {token: int(index) for token, index in vocab.items() if "audio" in token.lower()}
-    preferred = {token: index for token, index in audio.items() if "pad" in token.lower()}
-    return preferred or audio
+    return audio_payload_token_inventory(tokenizer.get_vocab())
 
 
 def _align_1d(tensor: torch.Tensor, length: int, pad_value: int | bool) -> torch.Tensor:

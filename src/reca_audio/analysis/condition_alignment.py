@@ -15,6 +15,23 @@ from typing import Any
 import torch
 
 
+def audio_payload_token_inventory(vocab: dict[str, int]) -> dict[str, int]:
+    """Select Qwen audio payload placeholders, excluding lexical audio tokens.
+
+    Qwen2.5-Omni in this repository expands the input waveform into repeated
+    ``<|AUDIO|>`` positions and does not expose ``<|audio_pad|>``.  Matching
+    every vocabulary token containing the substring ``audio`` would silently
+    include ordinary prompt words such as ``audio`` and ``Audio``.
+    """
+
+    inventory = {
+        token: int(token_id)
+        for token, token_id in vocab.items()
+        if token.lower() in {"<|audio|>", "<|audio_pad|>"}
+    }
+    return inventory
+
+
 def find_last_subsequence_mask(
     input_ids: torch.Tensor | Sequence[int],
     needle: torch.Tensor | Sequence[int],

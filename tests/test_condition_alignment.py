@@ -27,6 +27,20 @@ def test_find_last_subsequence_mask_uses_last_occurrence():
     assert mask.tolist() == [False, False, False, True, True, False]
 
 
+def test_audio_payload_inventory_excludes_words_and_boundaries():
+    result = _module().audio_payload_token_inventory(
+        {
+            "audio": 1,
+            "Audio": 2,
+            "<|audio_bos|>": 3,
+            "<|audio_eos|>": 4,
+            "<|AUDIO|>": 5,
+            "<|audio_pad|>": 6,
+        }
+    )
+    assert result == {"<|AUDIO|>": 5, "<|audio_pad|>": 6}
+
+
 def test_masked_pool_rejects_empty_selection():
     with pytest.raises(ValueError, match="empty"):
         _module().masked_pool(torch.ones(3, 2), torch.zeros(3, dtype=torch.bool))
