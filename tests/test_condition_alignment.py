@@ -12,6 +12,12 @@ MODULE_PATH = (
     / "analysis"
     / "condition_alignment.py"
 )
+RUNNER_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "runs"
+    / "scripts"
+    / "diagnose_condition_alignment.py"
+)
 
 
 def _module():
@@ -58,6 +64,11 @@ def test_group_manifest_rows_uses_audio_content_not_distinct_paths(tmp_path):
     assert len(groups) == 2
     assert groups[0]["captions"] == ["caption one", "caption two", "caption one"]
     assert groups[0]["row_index"] == 0
+
+
+def test_runner_masks_the_exact_text_inserted_by_t2a_prompt_builder():
+    text = RUNNER_PATH.read_text(encoding="utf-8")
+    assert 'semantic_text=f"{caption}."' in text
 
 
 def test_masked_pool_rejects_empty_selection():

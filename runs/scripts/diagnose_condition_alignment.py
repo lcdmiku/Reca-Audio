@@ -490,7 +490,10 @@ def main() -> int:
         encode_one(
             kind="text",
             prompt=build_prompt(args.task, caption),
-            semantic_text=caption,
+            # build_prompt(T2A/T2M) appends one literal period.  Match the
+            # exact inserted text so captions already ending in punctuation
+            # (which become ``..``) do not fall back to a tail-token mask.
+            semantic_text=f"{caption}.",
             audio=None,
             storage=text_storage,
         )
