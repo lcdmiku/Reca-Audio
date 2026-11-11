@@ -41,6 +41,24 @@ def test_audio_payload_inventory_excludes_words_and_boundaries():
     assert result == {"<|AUDIO|>": 5, "<|audio_pad|>": 6}
 
 
+def test_group_manifest_rows_uses_audio_content_not_distinct_paths(tmp_path):
+    first = tmp_path / "caption_a.wav"
+    second = tmp_path / "caption_b.wav"
+    third = tmp_path / "other.wav"
+    first.write_bytes(b"same audio bytes")
+    second.write_bytes(b"same audio bytes")
+    third.write_bytes(b"different audio bytes")
+    rows = [
+        {"audio": str(first), "caption": "caption one"},
+        {"audio": str(second), "caption": "caption two"},
+        {"audio": str(third), "caption": "caption three"},
+    ]
+    groups = _module().group_manifest_rows_by_audio_sha(rows)
+    assert len(groups) == 2
+    assert groups[0]["captions"] == ["caption one", "caption two"]
+    assert groups[0]["row_index"] == 0
+
+
 def test_masked_pool_rejects_empty_selection():
     with pytest.raises(ValueError, match="empty"):
         _module().masked_pool(torch.ones(3, 2), torch.zeros(3, dtype=torch.bool))

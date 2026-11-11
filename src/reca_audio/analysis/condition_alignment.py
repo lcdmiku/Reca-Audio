@@ -8,11 +8,73 @@ to unit test without GPUs or model checkpoints.
 
 from __future__ import annotations
 
+import hashlib
 import math
+from collections import OrderedDict
 from collections.abc import Iterable, Sequence
+from pathlib import Path
 from typing import Any
 
 import torch
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def group_manifest_rows_by_audio_sha(
+    rows: Sequence[dict[str, Any]],
+    max_groups: int = 0,
+    max_captions_per_group: int = 5,
+) -> list[dict[str, Any]]:
+    """Group captions by audio content, not by filename or manifest row.
+
+    AudioCaps can materialize the same source clip under five distinct paths,
+    one for each caption.  When an audited SHA is absent from the manifest we
+    therefore hash the file bytes.  The first path remains the representative
+    audio loaded by the model; every caption in the SHA group is a positive.
+    """
+
+    grouped: OrderedDict[str, dict[str, Any]] = OrderedDict()
+    path_hashes: dict[str, str] = {}
+    for row_index, row in enumerate(rows):
+        raw_path = row.get("audio") or row.get("path") or row.get("wav")
+        if not raw_path:
+            raise KeyError(f"manifest row {row_index} has no audio/path/wav")
+        audio_path = str(Path(raw_path).expanduser().resolve())
+        explicit_sha = row.get("audio_sha256") or row.get("sha256")
+        if explicit_sha:
+            group_id = str(explicit_sha)
+        else:
+            if audio_path not in path_hashes:
+                path_hashes[audio_path] = _sha256_file(Path(audio_path))
+            group_id = path_hashes[audio_path]
+
+        if group_id not in grouped:
+            if max_groups and len(grouped) >= max_groups:
+                continue
+            grouped[group_id] = {
+                "group_id": group_id,
+                "audio_sha256": group_id,
+                "row_index": row_index,
+                "audio": audio_path,
+                "captions": [],
+            }
+        captions = grouped[group_id]["captions"]
+        caption = str(row.get("caption") or row.get("prompt") or "audio").strip() or "audio"
+        if caption not in captions and (
+            max_captions_per_group <= 0 or len(captions) < max_captions_per_group
+        ):
+            captions.append(caption)
+
+    selected = [item for item in grouped.values() if item["captions"]]
+    if len(selected) < 2:
+        raise ValueError("diagnostic needs at least two unique audio SHA groups")
+    return selected
 
 
 def audio_payload_token_inventory(vocab: dict[str, int]) -> dict[str, int]:

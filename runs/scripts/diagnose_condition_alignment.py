@@ -26,6 +26,7 @@ from reca_audio.analysis.condition_alignment import (
     alignment_metrics,
     audio_payload_token_inventory,
     find_last_subsequence_mask,
+    group_manifest_rows_by_audio_sha,
     mask_from_token_ids,
     masked_pool,
 )
@@ -92,46 +93,18 @@ def _parse_dit_specs(items: list[str]) -> OrderedDict[str, Path]:
     return result
 
 
-def _row_path(row: dict[str, Any]) -> str:
-    raw = row.get("audio") or row.get("path") or row.get("wav")
-    if not raw:
-        raise KeyError("manifest row has no audio/path/wav")
-    return str(Path(raw).expanduser().resolve())
-
-
-def _row_caption(row: dict[str, Any]) -> str:
-    return str(row.get("caption") or row.get("prompt") or "audio").strip() or "audio"
-
-
 def select_groups(
     dataset: AudioManifestDataset,
     max_groups: int,
     max_captions_per_group: int,
 ) -> list[dict[str, Any]]:
-    """Preserve manifest order and retain all positive captions per audio path."""
+    """Preserve manifest order and retain all positive captions per audio SHA."""
 
-    grouped: OrderedDict[str, dict[str, Any]] = OrderedDict()
-    for row_index, row in enumerate(dataset.rows):
-        group_id = str(row.get("audio_sha256") or row.get("sha256") or _row_path(row))
-        if group_id not in grouped:
-            if max_groups and len(grouped) >= max_groups:
-                continue
-            grouped[group_id] = {
-                "group_id": group_id,
-                "row_index": row_index,
-                "audio": _row_path(row),
-                "captions": [],
-            }
-        captions = grouped[group_id]["captions"]
-        caption = _row_caption(row)
-        if caption not in captions and (
-            max_captions_per_group <= 0 or len(captions) < max_captions_per_group
-        ):
-            captions.append(caption)
-    selected = [item for item in grouped.values() if item["captions"]]
-    if len(selected) < 2:
-        raise ValueError("diagnostic needs at least two unique audio groups")
-    return selected
+    return group_manifest_rows_by_audio_sha(
+        dataset.rows,
+        max_groups=max_groups,
+        max_captions_per_group=max_captions_per_group,
+    )
 
 
 def _token_ids(tokenizer: Any, text: str) -> list[int]:
