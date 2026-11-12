@@ -25,10 +25,13 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--train-root", type=Path, required=True)
     parser.add_argument("--groups", type=int, default=8)
+    parser.add_argument("--swap", action="store_true", help="Compare Base/Mix weight swaps")
     args = parser.parse_args()
     if args.groups < 2 or args.out.exists():
         parser.error("need at least two groups and a fresh output path")
     random.seed(42)
+    if args.swap:
+        torch.manual_seed(42)
     dataset = AudioManifestDataset(args.manifest, seconds=10)
     groups = select_groups(dataset, args.groups, 1)
     if len(groups) != args.groups:
@@ -71,8 +74,39 @@ def main():
         handles.append(layer.register_forward_hook(hook(f"block:{index}")))
         handles.append(layer.cross_attn.register_forward_hook(hook(f"attention:{index}")))
     try:
-        for arm in ("base", "pure", "mix"):
-            if arm != "base":
+        arms = ("base", "pure", "mix")
+        if args.swap:
+            arms = ("base", "base_mix_embed", "mix", "mix_base_embed",
+                    "mix_base_early_attention", "mix_base_embed_early_attention")
+            mix_state = _load_checkpoint(args.train_root / "mix" / "dit_exposure2000.pt")["dit"]
+            modules = {"embed": dit.model.to_cond_embed}
+            # Include the pre-attention normalization in each restored branch.
+            for i, layer in enumerate(layers[:6]):
+                modules[f"attention:{i}"] = layer.cross_attn
+                modules[f"norm:{i}"] = layer.cross_attend_norm
+            paths = {id(module): name for name, module in dit.named_modules()}
+            base_parts = {
+                name: {key: value.cpu().clone() for key, value in module.state_dict().items()}
+                for name, module in modules.items()
+            }
+        for arm in arms:
+            if args.swap:
+                if arm == "mix":
+                    dit.load_state_dict(mix_state, strict=True)
+                elif arm != "base":
+                    for name, module in modules.items():
+                        if arm == "base_mix_embed" and name != "embed":
+                            continue
+                        restore = (name == "embed" and "base_embed" in arm) or (
+                            name != "embed" and "early_attention" in arm
+                        )
+                        if restore:
+                            state = base_parts[name]
+                        else:
+                            prefix = paths[id(module)] + "."
+                            state = {key: mix_state[prefix + key] for key in base_parts[name]}
+                        module.load_state_dict(state, strict=True)
+            elif arm != "base":
                 payload = _load_checkpoint(args.train_root / arm / "dit_exposure2000.pt")
                 dit.load_state_dict(payload["dit"], strict=True)
                 del payload
@@ -114,7 +148,8 @@ def main():
             handle.remove()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("x", encoding="utf-8") as handle:
-        json.dump({"seed": 42, "groups": groups, "rows": rows}, handle, allow_nan=False)
+        json.dump({"seed": 42, "swap": args.swap, "early_attention_layers": list(range(6)) if args.swap else [],
+                   "groups": groups, "rows": rows}, handle, allow_nan=False)
 
 
 if __name__ == "__main__":
