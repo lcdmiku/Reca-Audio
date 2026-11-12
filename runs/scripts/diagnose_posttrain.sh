@@ -66,4 +66,5 @@ else
     exit 2
 fi
 test -s "$out/results.json"
+"$python_bin" runs/scripts/report_posttrain.py "$out"
 date -Is >"$out/COMPLETE"
