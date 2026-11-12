@@ -17,4 +17,6 @@
 
 三个训练组最大的五个 block 漂移均来自 31–35 层。Pure 的条件映射和 cross-attention 漂移比 T2A-only 更大，Mix 介于两者之间。三个模型其余主要子模块的全局漂移接近。前期完整 block 干预中，恢复 Mix 中段对最终 velocity 的影响大于恢复末段，且恢复中段没有提高 8-item T2A CLAP。参数差异、响应差异和生成分数需要分别报告。
 
+正式训练后 50 次更新的 block 梯度范数均值在第 12–16 层最大。36 个 block 的该梯度均值与最终相对 L2 的 Pearson 相关在 Pure、T2A-only、Mix 中依次为 −0.892、−0.896、−0.898。两项量的分母与时间范围不同，梯度还经过累积、裁剪、Adafactor 预条件及衰减学习率后才作用于参数。相关系数不能用来判定层的功能或方向。
+
 原始逐 block 与子模块记录在服务器 `runs/audits/posttrain_four_arm_smoke_v1/parameter_drift.json`。此处参数比较使用正式 checkpoint，和 smoke 的样本数、采样步数无关。

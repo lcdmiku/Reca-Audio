@@ -31,7 +31,7 @@
 | T2A-only | 0.94649 → 0.93678 | 0.93434 → 0.93730 | 0.72625 → 0.89160 |
 | Mix | 0.94649 → 0.93611 | 0.93434 → 0.93695 | 0.72630 → 0.89382 |
 
-T2A-only 的 held-out 单步 T2A loss 在 1000 和 2000 曝光均高于起点，和历史 AudioCaps CLAP 下降方向一致。三组 ReCA 单步 loss 均下降，包括从未接受 audio condition 训练的 T2A-only。要识别音频条件学习，须比较真实重建及 matched/mismatched 差值。梯度 cosine 衡量同一状态下局部梯度方向，无法单独解释生成退化。
+T2A-only 的训练 T2A loss 从前 50 次更新均值 1.03938 降到后 50 次的 1.02146，held-out 单步 T2A loss 在 1000 和 2000 曝光均高于起点，历史 AudioCaps CLAP 也下降。这与训练集拟合和泛化之间的差距相容。前后训练 batch 不同，训练 loss 差值本身无法定量估计过拟合。三组 ReCA 单步 loss 均下降，包括从未接受 audio condition 训练的 T2A-only。要识别音频条件学习，须比较真实重建及 matched/mismatched 差值。梯度 cosine 衡量同一状态下局部梯度方向，无法单独解释生成退化。
 
 ## 已支持和待验证的解释
 
@@ -46,4 +46,6 @@ T2A-only 的 held-out 单步 T2A loss 在 1000 和 2000 曝光均高于起点，
 
 AudioCaps 取 89 个唯一音频 SHA 各一条 caption，其中 8 个与探索集重叠，主要统计使用余下 81 个 SHA。MusicCaps 使用固定 seed 选择的 89 个唯一 SHA，保留项目的 T2M 文本模板。各组共用按全局索引分配的 seed 和 shard。10 秒窗口实际生成约 9.985 秒。四组 reconstruction 使用固定 crop 的 10 秒原音频、4×低通、静音 mel 输入和 CFG=1。错配用另一音频组的条件，与原目标保持相同初始随机种子。Geometry 分别保留 audio 和 text 两种条件，基于真实 latent 加噪与实际 CFG batch 中的两路输出计算。
 
-完整生成评测、四组参数漂移和 CFG geometry 的结果将在正式运行后填写。
+四个 checkpoint 的完整 SHA256、文件大小、任务序列 SHA256、部署版本及确定性样本列表见同目录 `protocol.json`。四组 checkpoint 已在 smoke 中通过 DiT 加载，原始存储精度的参数检查及相对 L2 结果见 `parameter_drift.md`。
+
+Smoke 以 2 步完成了四组各八种设置、每种两个样本的生成，以及两种条件的 geometry 和评分入口。正式输出位于服务器 `/home/linchudeng/Reca-Audio/runs/audits/posttrain_four_arm_v1/`，launcher 日志为同名 `.launcher.log`。正式结果和各评测表由服务器在 100 步生成、完整性核验和评分后写出。当前分析中的历史值、smoke 数值及正式配对指标分开使用。

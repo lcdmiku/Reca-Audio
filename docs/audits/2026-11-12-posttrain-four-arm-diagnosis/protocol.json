@@ -1,0 +1,1404 @@
+{
+  "git_commit": "8fe66502bba515dd375e3753cab3786e44a71140",
+  "deployed_commit": "commit=b85ded1\ndeployed_at=2026-11-12T14:44:23+00:00\nmanifest=b54a1fe7115c4f232e4eac5d3c904236b49d7f5c50e86c8354f4723bbc94500f\nfiles=109",
+  "smoke": false,
+  "steps": 100,
+  "dtype": "float16",
+  "sample_rate": 44100,
+  "seed": 1234,
+  "settings": {
+    "audio_10_cfg6": [
+      "audio",
+      441000,
+      6
+    ],
+    "audio_11_cfg6": [
+      "audio",
+      485100,
+      6
+    ],
+    "audio_10_cfg1": [
+      "audio",
+      441000,
+      1
+    ],
+    "audio_10_cfg2": [
+      "audio",
+      441000,
+      2
+    ],
+    "audio_10_cfg4": [
+      "audio",
+      441000,
+      4
+    ],
+    "music_10_cfg6": [
+      "music",
+      441000,
+      6
+    ],
+    "reca_matched": [
+      "reca",
+      441000,
+      1
+    ],
+    "reca_mismatched": [
+      "reca",
+      441000,
+      1
+    ]
+  },
+  "checkpoints": {
+    "base": {
+      "path": "Audio-Omni/model/model.ckpt",
+      "sha256": "8ddfdd6c965b7b1fc5c5af01e306cdfd78e44f56fd584789b8987233438e65b3",
+      "bytes": 22220882720
+    },
+    "pure": {
+      "path": "runs/train/reca_long_matrix_b_10s_v1/pure/dit_exposure2000.pt",
+      "sha256": "1288b376b67fa04a24d78d1c69a615ad1f0bca5a0b4a7c75729a2a62c75bad86",
+      "bytes": 12162313930,
+      "task_counts": {
+        "reca": 2000
+      },
+      "schedule_sha256": "1b2dd627014d19bd5a4014370061933562b591f8ea6d3d8caf461a58be28bdc3",
+      "contract": {
+        "accumulation": 4,
+        "arm": "b",
+        "equal_exposure_not_equal_updates": true,
+        "optimizer_updates": 500,
+        "peak_lr": 2e-05,
+        "schedule": "runs/train/reca_long_matrix_b_10s_v1/pure_schedule.jsonl",
+        "task_mode": "pure",
+        "total_exposures": 2000,
+        "warmup_exposures": 100
+      }
+    },
+    "t2a": {
+      "path": "runs/train/reca_long_matrix_b_10s_v1/t2a/dit_exposure2000.pt",
+      "sha256": "b13fae0ca7db84de8b58b38c1700f63628bbbb088f27bcfc090a555f4da82372",
+      "bytes": 12162313930,
+      "task_counts": {
+        "t2a": 2000
+      },
+      "schedule_sha256": "aae2cf71c5107a0754519152ab5a16bcf9ab558b6391e92cab3130141c026aef",
+      "contract": {
+        "accumulation": 4,
+        "arm": "b",
+        "equal_exposure_not_equal_updates": true,
+        "optimizer_updates": 500,
+        "peak_lr": 2e-05,
+        "schedule": "runs/train/reca_long_matrix_b_10s_v1/t2a_schedule.jsonl",
+        "task_mode": "t2a",
+        "total_exposures": 2000,
+        "warmup_exposures": 100
+      }
+    },
+    "mix": {
+      "path": "runs/train/reca_long_matrix_b_10s_v1/mix/dit_exposure2000.pt",
+      "sha256": "0aebe1aa9e8e7d69982079e556926ab9ef22b777785cae879d76ddcdec68e089",
+      "bytes": 12162313930,
+      "task_counts": {
+        "reca": 1000,
+        "t2a": 1000
+      },
+      "schedule_sha256": "8426bc72df2ab237ae3ce9e771ea76bd50935aae71cec92d273ec2f06c0f703b",
+      "contract": {
+        "accumulation": 4,
+        "arm": "b",
+        "equal_exposure_not_equal_updates": true,
+        "optimizer_updates": 500,
+        "peak_lr": 2e-05,
+        "schedule": "runs/train/reca_long_matrix_b_10s_v1/mix_schedule.jsonl",
+        "task_mode": "balanced_mix",
+        "total_exposures": 2000,
+        "warmup_exposures": 100
+      }
+    }
+  },
+  "history": {
+    "AudioCapsHeldout/base": {
+      "metrics": {
+        "benchmark": "AudioCaps",
+        "n_gen": 445,
+        "n_ref": 445,
+        "fad_clap": 0.35142645639486747,
+        "kl": 2.1666488647460938,
+        "is": 7.027235984802246,
+        "fd": 64.07934730475716,
+        "clip": 0.46095835259783235
+      },
+      "first_frames": 483328,
+      "sample_rate": 44100,
+      "path": "runs/Benchmark/output/Matrix_v1_eval3_6gpu_9ce3984/AudioCapsHeldout/base"
+    },
+    "AudioCapsHeldout/pure": {
+      "metrics": {
+        "benchmark": "AudioCaps",
+        "n_gen": 445,
+        "n_ref": 445,
+        "fad_clap": 0.3929054666680166,
+        "kl": 2.1853675842285156,
+        "is": 7.112107276916504,
+        "fd": 65.89392754548979,
+        "clip": 0.43857788903605244
+      },
+      "first_frames": 483328,
+      "sample_rate": 44100,
+      "path": "runs/Benchmark/output/LongMatrixB_10s_eval_v1/AudioCapsHeldout/pure"
+    },
+    "AudioCapsHeldout/t2a": {
+      "metrics": {
+        "benchmark": "AudioCaps",
+        "n_gen": 445,
+        "n_ref": 445,
+        "fad_clap": 0.38100613393417676,
+        "kl": 2.1058380603790283,
+        "is": 6.546505928039551,
+        "fd": 65.37665895415597,
+        "clip": 0.4309554083507596
+      },
+      "first_frames": 483328,
+      "sample_rate": 44100,
+      "path": "runs/Benchmark/output/LongMatrixB_10s_eval_v1/AudioCapsHeldout/t2a"
+    },
+    "AudioCapsHeldout/mix": {
+      "metrics": {
+        "benchmark": "AudioCaps",
+        "n_gen": 445,
+        "n_ref": 445,
+        "fad_clap": 0.3926311265879358,
+        "kl": 2.121201753616333,
+        "is": 6.676024436950684,
+        "fd": 64.99778843828973,
+        "clip": 0.4286422447910631
+      },
+      "first_frames": 483328,
+      "sample_rate": 44100,
+      "path": "runs/Benchmark/output/LongMatrixB_10s_eval_v1/AudioCapsHeldout/mix"
+    },
+    "MusicCaps/base": {
+      "metrics": {
+        "benchmark": "MusicCaps",
+        "n_gen": 1004,
+        "n_ref": 1004,
+        "fad_clap": 0.32378629566149447,
+        "kl": 1.3411993980407715,
+        "is": 3.442497968673706,
+        "fd": 18.515364113345157,
+        "clip": 0.3881746291857165
+      },
+      "first_frames": 483328,
+      "sample_rate": 44100,
+      "path": "runs/Benchmark/output/Matrix_v1_eval3_6gpu_9ce3984/MusicCaps/base"
+    },
+    "MusicCaps/pure": {
+      "metrics": {
+        "benchmark": "MusicCaps",
+        "n_gen": 1004,
+        "n_ref": 1004,
+        "fad_clap": 0.2730630623425143,
+        "kl": 1.3088274002075195,
+        "is": 3.40264892578125,
+        "fd": 17.320603689781578,
+        "clip": 0.39907661874506933
+      },
+      "first_frames": 483328,
+      "sample_rate": 44100,
+      "path": "runs/Benchmark/output/LongMatrixB_10s_eval_v1/MusicCaps/pure"
+    },
+    "MusicCaps/t2a": {
+      "metrics": {
+        "benchmark": "MusicCaps",
+        "n_gen": 1004,
+        "n_ref": 1004,
+        "fad_clap": 0.30449055174003703,
+        "kl": 1.2992017269134521,
+        "is": 3.3514416217803955,
+        "fd": 17.9865244469721,
+        "clip": 0.39981079946879294
+      },
+      "first_frames": 483328,
+      "sample_rate": 44100,
+      "path": "runs/Benchmark/output/LongMatrixB_10s_eval_v1/MusicCaps/t2a"
+    },
+    "MusicCaps/mix": {
+      "metrics": {
+        "benchmark": "MusicCaps",
+        "n_gen": 1004,
+        "n_ref": 1004,
+        "fad_clap": 0.2581780528952541,
+        "kl": 1.3150817155838013,
+        "is": 3.441530704498291,
+        "fd": 16.769132545987283,
+        "clip": 0.4056662706635709
+      },
+      "first_frames": 483328,
+      "sample_rate": 44100,
+      "path": "runs/Benchmark/output/LongMatrixB_10s_eval_v1/MusicCaps/mix"
+    }
+  },
+  "exploration_overlap": 8,
+  "test_manifest": "runs/Benchmark/_data/audiocaps/reca_split_v1/test_manifest.jsonl",
+  "audio": [
+    {
+      "sha": "050c795b1e86f2684fa1216ddf95336921dca715e6652f05b1318e0a12a80bbe",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105928.wav",
+      "row": 23,
+      "prompt": "A speedboat is racing across water with loud wind noise",
+      "exploratory": false
+    },
+    {
+      "sha": "05c222c488c8296f66e94e1a277698ed8e99d825ff5a794aaa6a71356ce85d68",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/102865.wav",
+      "row": 31,
+      "prompt": "Typing on a computer keyboard",
+      "exploratory": false
+    },
+    {
+      "sha": "06deb9c7aa8be12283b7d6491dfd6d2d3711d294fb12464f6a99c4ac4066233e",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/16898.wav",
+      "row": 49,
+      "prompt": "Beeping occurs, an adult male speaks, blasts and shots occur, and a helicopter is operating",
+      "exploratory": false
+    },
+    {
+      "sha": "0a9fea352c24ed3492634b24bd817e78053f22968476798e627a5a085a221974",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104894.wav",
+      "row": 57,
+      "prompt": "Clicking followed by booming engines accelerating into the distance",
+      "exploratory": false
+    },
+    {
+      "sha": "0d13bd6bc49b64e02bd2cc5c0e7c2e452ce7e7297f1e53990f504668ace5c8bb",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106382.wav",
+      "row": 75,
+      "prompt": "A woman talking as goats are baaing followed by footsteps on gravel then a man talking while an airplane flies in the distance",
+      "exploratory": false
+    },
+    {
+      "sha": "0dbddfdc853ba77cbc7ee3758e70f049b2a30f17a6b395daa48dc14093fcd355",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105383.wav",
+      "row": 40,
+      "prompt": "A man talking before and after a young kid talks as plastic rattles followed by an electronic beep",
+      "exploratory": false
+    },
+    {
+      "sha": "0e86a4967cab76beeeb9ef8681fe439a1ea435ba5ef4c5161888609efee6cf59",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104307.wav",
+      "row": 50,
+      "prompt": "Brief speech followed by whistling a tune",
+      "exploratory": false
+    },
+    {
+      "sha": "0ed59cb41b818ee29ca2ecadc8759912375fb1e4d599e005b8c2bf118221fcac",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104511.wav",
+      "row": 63,
+      "prompt": "Gunshots firing before and after a person loudly exhaling followed by a revolver chamber spinning as a heart beats and footsteps walking on a stone surface",
+      "exploratory": false
+    },
+    {
+      "sha": "1bc69ffad5a2a3de992ededb59f44de67c2c86c16f4fbc7ee7bff68b311755e4",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105698.wav",
+      "row": 168,
+      "prompt": "A child is speaking followed by a door moving",
+      "exploratory": false
+    },
+    {
+      "sha": "1e8d74c306714c671fb35c219fcfcdcb494eae9a73c55be06a6c8577a7535965",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105372.wav",
+      "row": 83,
+      "prompt": "Some rowing sounds in water with light wind",
+      "exploratory": false
+    },
+    {
+      "sha": "1fb344ff4a094798807022e3c68c592789ea4c099731cc110f93e591848e3cd9",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103559.wav",
+      "row": 194,
+      "prompt": "Rustling pigeons coo",
+      "exploratory": false
+    },
+    {
+      "sha": "251b24ffa35a6ce6ca0d19819ce80d887caf6cf5dc0347ca862343b7b19b14e3",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103011.wav",
+      "row": 19,
+      "prompt": "A man speaks followed by popping noise and laughter",
+      "exploratory": false
+    },
+    {
+      "sha": "2631a6d42f04beaea741972c17bfb27331c2184efcc70fe6ce803724a6879e31",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103438.wav",
+      "row": 70,
+      "prompt": "Plastic clicking and camera muffling followed by a toy helicopter motor starting up",
+      "exploratory": false
+    },
+    {
+      "sha": "29395aa48bd72d5b941d8807dbdf5cc5467a4bec0c17678820487610d8903c1c",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104454.wav",
+      "row": 35,
+      "prompt": "A man speaks then whistles with a playing guitar",
+      "exploratory": false
+    },
+    {
+      "sha": "2fa1ab1ba7cec1d9f7b41a1ba50b07e881787d63c927e9a0a111e6c49a758c17",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/102991.wav",
+      "row": 45,
+      "prompt": "A series of burping and farting",
+      "exploratory": false
+    },
+    {
+      "sha": "30965752ba2f43b344501f7bbf4af8e235959b24031ad8d85ee17294f70df385",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103212.wav",
+      "row": 208,
+      "prompt": "A man and a woman talking as paper crinkles",
+      "exploratory": false
+    },
+    {
+      "sha": "36479b07440b5cc9773984f257820ad353a4773ccab144d0b2e951cb6be57736",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106019.wav",
+      "row": 131,
+      "prompt": "A motor vehicle engine clicks and whirs and tries to start three times, metal clinks softly, then a deep buzz occurs",
+      "exploratory": false
+    },
+    {
+      "sha": "3a0367da3757386f7f1b1ffd9fdd782a83ed960a783272d2bfad2c23e2b0eb02",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106493.wav",
+      "row": 250,
+      "prompt": "A man talking while bongos play followed by frogs croaking",
+      "exploratory": false
+    },
+    {
+      "sha": "3ce78bd8ee8b918c6af2dbcc1ffb14292f397cfa81b676ce382916beb8825f49",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/107206.wav",
+      "row": 24,
+      "prompt": "A paper is being crumpled",
+      "exploratory": false
+    },
+    {
+      "sha": "3fdbde05b6c465ed9bf641e4469fd0303c9f50b9163b8e5fb24bc2af2dac04ac",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/107255.wav",
+      "row": 113,
+      "prompt": "Water softly trickling",
+      "exploratory": false
+    },
+    {
+      "sha": "400190f7ee27a2c77b0902a81c6e36b848e5b211cf240ea64b8e7e1d8cf5892b",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106921.wav",
+      "row": 38,
+      "prompt": "Wind blowing followed by a scream with people speaking faintly in the distance",
+      "exploratory": false
+    },
+    {
+      "sha": "40ca98907a53a111de1aed75636205b927f832dd3233d1a44e6d915caa647a96",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106104.wav",
+      "row": 258,
+      "prompt": "Birds chirping and a horse neighing",
+      "exploratory": false
+    },
+    {
+      "sha": "40e19116dec3c8c9bff987ebea76f20294d8b2fef921e2b3bd7aab0048708f97",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103298.wav",
+      "row": 218,
+      "prompt": "A horn sounds as wind blows followed by motor vehicle engine noise",
+      "exploratory": false
+    },
+    {
+      "sha": "44e80cde39079e396ad780933f51b1e0be593047bdd3d6d22639b415be6a0407",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104510.wav",
+      "row": 64,
+      "prompt": "A loud burping followed by a laughing from young girls",
+      "exploratory": false
+    },
+    {
+      "sha": "47c5bffa7a2839bb996620a7a8186779f25de8cf9e9a0848cf3d5bf1c231e126",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104494.wav",
+      "row": 116,
+      "prompt": "Man speaks midst a crowd, a distant horn blow, then a race car goes by",
+      "exploratory": false
+    },
+    {
+      "sha": "4c84939a7bb6d652d117fae1d7981d1147434b93e4406707c6c1b0e915a44ce1",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106591.wav",
+      "row": 229,
+      "prompt": "Wind blows hard then a man speaks",
+      "exploratory": false
+    },
+    {
+      "sha": "4cb79bc862e416b670016204db117f0aa85fc9003141f2fec7174fbac7ba73c3",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106347.wav",
+      "row": 54,
+      "prompt": "Camera rattling and muffling as a woman speaks in the background",
+      "exploratory": false
+    },
+    {
+      "sha": "5246e8e463a2fdd1e4d4db4b4f712cb5bf8fd51e4263aa7ac993795092b06e0e",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106148.wav",
+      "row": 15,
+      "prompt": "Hissing together with an engine chugging",
+      "exploratory": false
+    },
+    {
+      "sha": "54939d89c7e08f5a9260c938c5edfdc29a7d5762d72d72f5c3fafc49792fd7f3",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103436.wav",
+      "row": 69,
+      "prompt": "Man talks while sheep bleats followed by another man laughing",
+      "exploratory": false
+    },
+    {
+      "sha": "57ac46ff702fd9d4d1c4bdf8410673bb3612266c1ea83fb63c8455a285bca17c",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/107097.wav",
+      "row": 144,
+      "prompt": "People speak followed by a loud air horn and people laughing",
+      "exploratory": false
+    },
+    {
+      "sha": "5a2ac9bdda8449486a574714ea1cdfb848c6b1a6ccec36e634cc16df03980c7a",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/18180.wav",
+      "row": 46,
+      "prompt": "Roaring is present, cracking occurs, a metal clink, and an adult male speaks",
+      "exploratory": false
+    },
+    {
+      "sha": "5d251aee85f9542247ac3463345a8d9987155bb91847fb17a8a276540a458cd6",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103746.wav",
+      "row": 93,
+      "prompt": "Race car revving its engine",
+      "exploratory": false
+    },
+    {
+      "sha": "5f8348e61bd5d20ddd69e734cb0260eb452ecd6b2840a14b456a1aefe535272d",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106970.wav",
+      "row": 41,
+      "prompt": "A motorboat engine running as a man talks followed by wind blowing into a microphone and plastic clacking",
+      "exploratory": false
+    },
+    {
+      "sha": "63f8e202fe77a26a2751d2712e6e2cd7df2f982f9bcfc6d4a578b125fc14d2a6",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103741.wav",
+      "row": 92,
+      "prompt": "Water pouring from a faucet and draining into a pipe while a young girl talks followed by a brush scrubbing then a person spitting",
+      "exploratory": false
+    },
+    {
+      "sha": "69c84736f5dc473119267f96f92d8ac7b7dc3f0b2191bb54df1f78770620fdae",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104682.wav",
+      "row": 125,
+      "prompt": "Loud ringing of a clock followed by faint tick rocks",
+      "exploratory": false
+    },
+    {
+      "sha": "6a7557d46f54d387b836467c9dc5ec1bc6580da74e5d13cee5b0b1c74cc71a28",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105037.wav",
+      "row": 78,
+      "prompt": "A woman gives a speech followed by applause",
+      "exploratory": false
+    },
+    {
+      "sha": "6abb189aa8d01e7e3eb46b0a5a4ae6905a0d852bbdc02ac94443c9504373cf74",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106551.wav",
+      "row": 21,
+      "prompt": "An emergency vehicle has the siren on",
+      "exploratory": false
+    },
+    {
+      "sha": "6ebabcaa304b3ce76f31a81503a283e1d2b493ebd6e3143a12186d79c67246b2",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103012.wav",
+      "row": 18,
+      "prompt": "A clock ticks with breathing in the background",
+      "exploratory": false
+    },
+    {
+      "sha": "74c915403463b0ff5ed705df49707e035a03b3aef319e568987046bb88a86371",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106379.wav",
+      "row": 30,
+      "prompt": "A crowd of people applauding and cheering",
+      "exploratory": false
+    },
+    {
+      "sha": "76874605d8ea592d4db4313a26053684cc69e66d46761f2978d3b28ce248ca76",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103475.wav",
+      "row": 8,
+      "prompt": "A man speaking as a crowd of people laugh and applaud",
+      "exploratory": false
+    },
+    {
+      "sha": "7957714535290e668aad7f8ce6afa82721f89d6219701afb1d1d7f9e2eb60fa0",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104129.wav",
+      "row": 175,
+      "prompt": "Metal clanking and gears cranking as steam hisses",
+      "exploratory": false
+    },
+    {
+      "sha": "7cacef41a3a6a4fec0ae6c15870fa6756f4b13c0140a9a65cfd0f78a7b49bfd1",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/107259.wav",
+      "row": 114,
+      "prompt": "Wind is blowing and heavy rain is falling and splashing",
+      "exploratory": false
+    },
+    {
+      "sha": "7ee118acc0ed3b096a47236cf9502443a3e8151a70605aea0ca83a7fa7689614",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/107131.wav",
+      "row": 12,
+      "prompt": "A power tool drill operating continuously",
+      "exploratory": false
+    },
+    {
+      "sha": "7f46c2b9bdb40e4d5ca7184fff4758ce728a937ecb5d17ba0f3dc8ffaaabd9ad",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104723.wav",
+      "row": 74,
+      "prompt": "Loud humming followed by hissing",
+      "exploratory": false
+    },
+    {
+      "sha": "8164d640c813b19dc1f6bf69678bda4720811e0c7afc72c6955819cd13ff7f28",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105776.wav",
+      "row": 48,
+      "prompt": "Two large loud burps",
+      "exploratory": false
+    },
+    {
+      "sha": "817036bcbea107000b9a6711b00356dcd647569dc7ca5c4443b99437653686fc",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103937.wav",
+      "row": 13,
+      "prompt": "A man speaking as a stream of water splashes and flows while music faintly plays in the distance",
+      "exploratory": false
+    },
+    {
+      "sha": "8347e4c3eb09c931a5d11aa206deabdbc65915392ccc965085f0f67d7a8b6e1d",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105524.wav",
+      "row": 43,
+      "prompt": "Frogs croaking and a humming with insects vocalizing",
+      "exploratory": false
+    },
+    {
+      "sha": "85804b866ea9997f766c4f06ff931f323577e5ae617176032d41688d140948d1",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106883.wav",
+      "row": 44,
+      "prompt": "A woman talking while children talk in the background",
+      "exploratory": false
+    },
+    {
+      "sha": "8a353356dbe355c71bdad0449746e25e497054ab10bf39d28063acf49ba8db6a",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105620.wav",
+      "row": 196,
+      "prompt": "A toilet flushing",
+      "exploratory": false
+    },
+    {
+      "sha": "8b9aa18e83bd781bddddc86fa1adb0c036981f041bfb163962acfe7b599daa38",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106598.wav",
+      "row": 230,
+      "prompt": "Water splashing occurs while a person quacks to imitate a duck and an adult female laughs",
+      "exploratory": false
+    },
+    {
+      "sha": "8d5ed17596865377017775303345b96a324ff6ad83c7dbcb1d645defc8fafee0",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105929.wav",
+      "row": 22,
+      "prompt": "An engine running",
+      "exploratory": false
+    },
+    {
+      "sha": "92118f71fd72b68c0d161be54d67f396be23e33728cecbf654ac0ab055241a63",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/3628.wav",
+      "row": 28,
+      "prompt": "A car engine is revving while driving",
+      "exploratory": false
+    },
+    {
+      "sha": "a394fd7a88fa93ac245e64268cd01e172ab0178f49a3a0d043ad1c4a5e6755ae",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/102891.wav",
+      "row": 76,
+      "prompt": "Glass doors slamming and sliding shut",
+      "exploratory": false
+    },
+    {
+      "sha": "a6c46446dc1941e949c781d946ef212763cc20d12e5ffa0aaa11b468ddd6c38c",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106766.wav",
+      "row": 207,
+      "prompt": "A person types on a keyboard",
+      "exploratory": false
+    },
+    {
+      "sha": "a87f7e0d95a7de83a07359296f573d9c09a095b868385c01bebdca5e127db9cc",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103197.wav",
+      "row": 27,
+      "prompt": "A kid crying as a man and a woman talk followed by a car door opening then closing",
+      "exploratory": false
+    },
+    {
+      "sha": "ab69d70803bcf13ac7f9464b51f1711dbb1b6470098ed632d05ce446b2dea79d",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/481.wav",
+      "row": 88,
+      "prompt": "Muffled sounds followed by metal being hit",
+      "exploratory": false
+    },
+    {
+      "sha": "adfc70e7d55b4104f405aea5599eaf375a016cc47d082f95fcbb632bc9b4f051",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104309.wav",
+      "row": 52,
+      "prompt": "Sheep bleating with a baby sheep baaing",
+      "exploratory": false
+    },
+    {
+      "sha": "ae7c83a92d446b2bd097e5b5e6d621d018b1570e971794efec4ace09f6379cef",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104750.wav",
+      "row": 100,
+      "prompt": "A duck chirping as water lightly trickles and splashes",
+      "exploratory": false
+    },
+    {
+      "sha": "b204cac04149a65e304eb57c5ce588727d8fe75f100da1e1ecf9804cd9683e2a",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106667.wav",
+      "row": 10,
+      "prompt": "A series of computer mouse clicks followed by a kid crying",
+      "exploratory": false
+    },
+    {
+      "sha": "beb4f59802252afd881ef525f46b0f63460a57911108a233ef7015844471193b",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104425.wav",
+      "row": 29,
+      "prompt": "Ducks quacking as birds chirp followed by a flock of ducks quacking",
+      "exploratory": false
+    },
+    {
+      "sha": "c258c5a0f3a015c26e0732e884da3742ca752e64faea5b1d13dbc6454d13062c",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103142.wav",
+      "row": 115,
+      "prompt": "Typing on a computer keyboard",
+      "exploratory": false
+    },
+    {
+      "sha": "c3b94675d4c7313a97c3f8a5747fb670344f318bea8c69ca89330020a946aaec",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105525.wav",
+      "row": 42,
+      "prompt": "Rapid clicking occurs, a motor vehicle engine attempts to start and grinds, then the engine fully engages and begins to run and vibrate",
+      "exploratory": false
+    },
+    {
+      "sha": "c50d2c672d0c012252fcfba5305e1170079c48f8583b4be4d904cae860c0e97d",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105403.wav",
+      "row": 9,
+      "prompt": "A drone whirring followed by a crashing sound",
+      "exploratory": false
+    },
+    {
+      "sha": "c6fff5d99a608220b072b8637744d741379481a58092ab1c442bf6e5f1f2ae8d",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104495.wav",
+      "row": 71,
+      "prompt": "A cat meowing followed by a goat screaming while a crowd of people talk in the background",
+      "exploratory": false
+    },
+    {
+      "sha": "c82f0e8b44d9680ac1438f7615119921bd061815944363a79e4cfffc33ba84f8",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105218.wav",
+      "row": 186,
+      "prompt": "A woman and a child is communicating, and birds chirp",
+      "exploratory": false
+    },
+    {
+      "sha": "ca441be28c56f869f1ffc46ab9c26d4c2bbe4465f1e8b04a543898dda894b36f",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/102750.wav",
+      "row": 11,
+      "prompt": "Pigeons cooing as air lightly hisses in the background followed by a camera muffling",
+      "exploratory": false
+    },
+    {
+      "sha": "cc4adf50217ae51e3f2a721ae8c6e2e21d41f0a2f61c81d42e7359923a7ea94c",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104604.wav",
+      "row": 107,
+      "prompt": "A baby cries, and people are communicating",
+      "exploratory": false
+    },
+    {
+      "sha": "cc4daa3cd8a564131e62d25333e1fbcbeade4b5e962d2da68168ca87a592452c",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/107422.wav",
+      "row": 33,
+      "prompt": "A vehicle engine gurgling followed by a horn tooting as wind blows into a microphone",
+      "exploratory": false
+    },
+    {
+      "sha": "cc594ebdc4073f22272ef507cf8f8561062a942d4ab4458f7eb661234a2122ec",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104493.wav",
+      "row": 72,
+      "prompt": "A man talking as gusts of wind blow followed by an aircraft flying by",
+      "exploratory": false
+    },
+    {
+      "sha": "d53fd766e34dadc634bcbcba2049be84d351a3469e1ad7ff66901dbd832bc7b2",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105480.wav",
+      "row": 34,
+      "prompt": "A mid-size motor vehicle engine idles smoothly and is then revved several times, followed by a car door shutting",
+      "exploratory": false
+    },
+    {
+      "sha": "d5d219c12d483a83f638361e3c6597ddc4bd9cd3dd2fdcbe67729860993aa743",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/106146.wav",
+      "row": 14,
+      "prompt": "Water running continuously",
+      "exploratory": false
+    },
+    {
+      "sha": "e36103a497b8192735c43d086315f2a86616365c479a8b3127cf18f081574b80",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104220.wav",
+      "row": 85,
+      "prompt": "Beeping with men speaking faintly in the distance with an air release",
+      "exploratory": false
+    },
+    {
+      "sha": "e67aa5f67f60fadcab75b272f09b337b211e6d4f86c1a0c3bdf63e31f1aea711",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103191.wav",
+      "row": 26,
+      "prompt": "Applause and speech followed by a loud high pitched bell and more applause and speech",
+      "exploratory": false
+    },
+    {
+      "sha": "ea817d0f5e13ae7298c8d9c16ff84845d1e9185d075e90b32856daf861fc7680",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104077.wav",
+      "row": 20,
+      "prompt": "A man speaks followed by vibrations of a power tool",
+      "exploratory": false
+    },
+    {
+      "sha": "eabfade0f6d63521a7ee988a39bef2fd9cdc2ee797d937f5d4bba85fbc37d9ef",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104260.wav",
+      "row": 36,
+      "prompt": "A vehicle engine revving a few times",
+      "exploratory": false
+    },
+    {
+      "sha": "f14c7ce41a1bccfbcf4cd580df8ff325fd43304409ee33440d8c9596058112c5",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104770.wav",
+      "row": 156,
+      "prompt": "A man speaks then a small bird chirps",
+      "exploratory": false
+    },
+    {
+      "sha": "f4b94cf06ca6d495e20cdcc42c9015f81bf5bf652924bffbd2f219cb01649a7c",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104239.wav",
+      "row": 241,
+      "prompt": "Three young ladies' speech while sheep bleats",
+      "exploratory": false
+    },
+    {
+      "sha": "f772b5ff5d6b5b1ca6ea03ddd51fdf97f5cbc47fca3be76b4f70e7f5a027da72",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105423.wav",
+      "row": 157,
+      "prompt": "An aircraft engine running then slowing down after a plastic click",
+      "exploratory": false
+    },
+    {
+      "sha": "f838cbb228adf789b030d2eb53062f5807e69969b2410dc0b26c63c11d4702b0",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103015.wav",
+      "row": 17,
+      "prompt": "A man speaks with distant traffic passing and some nearby rattling",
+      "exploratory": false
+    },
+    {
+      "sha": "fb6c6e2e922e1a6243c3b1220fa648bfabc0cac9534671f9f2ed8e5e2a671d90",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/102812.wav",
+      "row": 98,
+      "prompt": "A vacuum cleaner running as leaves rustle and a swarm of insects buzz while wind blows into a microphone",
+      "exploratory": false
+    },
+    {
+      "sha": "fe0962753893e17490fdb6992323b1e0db29ede6af790d59479fdf8d9fcf0938",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/105195.wav",
+      "row": 191,
+      "prompt": "Church bells tolling followed by a smaller bell ringing",
+      "exploratory": false
+    },
+    {
+      "sha": "02c6545686556e141557c85c107605b74cb12639b2bfea4318feb43c367514a9",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103938.wav",
+      "row": 2,
+      "prompt": "Thunder and a gentle rain",
+      "exploratory": true
+    },
+    {
+      "sha": "2296044efa0c7bbd1142858d4399cd3d2cd2cc8e526306b3467ce9d54dd9ac03",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103549.wav",
+      "row": 0,
+      "prompt": "Constant rattling noise and sharp vibrations",
+      "exploratory": true
+    },
+    {
+      "sha": "5f3cd64ee5ab9514bed41df57c977f46d2912e035891a60ad75240ac993bac75",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/104275.wav",
+      "row": 3,
+      "prompt": "An infant crying followed by a man laughing",
+      "exploratory": true
+    },
+    {
+      "sha": "67de60ab3ccd385376cbe497b5bc23ab83d61e60266394e8f9991495ef1b8ec2",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103478.wav",
+      "row": 7,
+      "prompt": "Several birds chirp with some hissing",
+      "exploratory": true
+    },
+    {
+      "sha": "7ddc174e8a45f297f3861e040c8358e1aad3b05fe014d595af7972387a815a61",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103542.wav",
+      "row": 1,
+      "prompt": "Food is frying, and a woman talks",
+      "exploratory": true
+    },
+    {
+      "sha": "9acee4ad9f3e78d1919fe8d97090a0db127a23a193540b3f98bb28055cf3dec5",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/102945.wav",
+      "row": 4,
+      "prompt": "Ocean waves crashing in the distance as young girl talks followed by a young man talking while a group of children laughs in the background and wind blows into a microphone",
+      "exploratory": true
+    },
+    {
+      "sha": "c2a1f9d277dd889693d183416b5b880c8260a3405aa2f18f054a8f19c3828c8f",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/107284.wav",
+      "row": 6,
+      "prompt": "Bells ring followed by humming and vibrations as a train passes while blowing a horn",
+      "exploratory": true
+    },
+    {
+      "sha": "ccc224e2d0417f24dffa364bf5598db8db7d4eb9ad4d30b136ddb3584f702d47",
+      "ref": "runs/Benchmark/_data/audiocaps/full2/ref/103705.wav",
+      "row": 5,
+      "prompt": "Motorboat engine screams as it accelerates",
+      "exploratory": true
+    }
+  ],
+  "music": [
+    {
+      "sha": "b2b69f47175da7bcd5e8b46327dce3abcfea431ef8bb11a0ddc1f70209c2d1fe",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/CgK0DU3KFBc_30.wav",
+      "prompt": "This slow jazz song features a female voice. This is accompanied by an acoustic guitar playing chords. A keyboard plays a fills using a xylophone-like tone. The bass plays the root notes of the chords. Finger snaps are played in some spaces between lines. A shaker provides the percussion for this song. The song features a jazz chord progression providing some complexity to this song. The mood of this song is romantic. This song can be played in a romantic movie.",
+      "exploratory": false
+    },
+    {
+      "sha": "3dcc55878dc1a72f9f9600fd86175d5dd25d04e3ec4090e542ce116f3ff9c33d",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/_HXMIdSiOMA_30.wav",
+      "prompt": "The music excerpt features a kind of vinyl scratch solo. At one point a male voice intervention can be heard that's similar to the sound one makes when he's being punched in the stomach. In the background a drum beat runs in loop.",
+      "exploratory": false
+    },
+    {
+      "sha": "9c9a3af526a5070dcce88acbc545953624a70f8b084885965a6471d0d3ca7b5d",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/7ITwarmdyfI_0.wav",
+      "prompt": "This music is an instrumental with a lot of vocalisation and animated sounds. There are sounds of swishing, water bubbling, guitar string plonking, acoustic guitar riff, camera clicking pictures, kids screaming in glee, cheering and clapping. This music seems to be an introduction to a Show.",
+      "exploratory": false
+    },
+    {
+      "sha": "da5513b43be922e97e90fa2fb96b99617d98c037ca0d760e4ac547a2e319c911",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/wwbATvWFaLY_30.wav",
+      "prompt": "This is a French opera music piece. It is an instrumental piece. There are two harpsichords performing the piece. There is a medieval sound to the piece. It has a dramatic and grandiose feel. This piece could be used in the soundtrack of a movie or a TV series that takes place in the medieval era, especially during scenes of intrigue.",
+      "exploratory": false
+    },
+    {
+      "sha": "e34d6379a13b543661238e546badafb78d44d075c1a769ee349ccc7fbc9ed7f6",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/oGbNzR_lpSk_480.wav",
+      "prompt": "The low quality recording features a loud wind and water splashing sound effects, while there is a widely spread electric guitar melody and marimba, followed by smooth bass, soft kick, shimmering shakers and tambourine playing in the background. It is noisy and it sounds like it was recorded with the phone, while the music was added in post production.",
+      "exploratory": false
+    },
+    {
+      "sha": "02d4f87aa9eb6342b8da2fc542dee4c1ff27ff5517d31c8e1faf04a2cd30bba2",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/aryufzYGhbM_30.wav",
+      "prompt": "This song is in very poor audio-quality and seems to lag. A big pulsating synthesizer pad is creating tension along with some more single holding note, higher register synth pad. A riser effect tells us that this part of the song is about to break into another part that will bring relief from the created tension. A synthesizer pluck is playing a catchy repeating melody. The male voice sings/raps in the higher register a male backing voice is shouting in the background. This song may be played on a dj mix in a club.",
+      "exploratory": false
+    },
+    {
+      "sha": "18424c3a61f2b7d0366e924d851a4154e5c9a4726aaf6fdd9730cf098ece1eae",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/LK6zk03lPlM_10.wav",
+      "prompt": "This is a jingle piece in the background of a tech comparison video. There are various sound effects such as clock ticking and a camera shutter. The electric guitar is playing the same chord repeatedly with electronic drum hits to create an aura of tension. This piece can be used in advertisement jingles. It could also be used in the soundtrack of reality competition programs.",
+      "exploratory": false
+    },
+    {
+      "sha": "8f9118552d242ee0889715a558a3ac21192ef6fbe353629fb31f35d8ee188eb0",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/VZJfkEet6EQ_30.wav",
+      "prompt": "The song is an instrumental. The tempo is medium and changes as the player changes the lick. The guitar is played solo styling with jarring string action. Playing amateur music is like a music lesson. The song is a bass guitar tutorial and sounds amateurish. The audio quality is poor.",
+      "exploratory": false
+    },
+    {
+      "sha": "9fc6754f5c6652ab89a909748a1f8055f2d43a9908ea6b45b0b58b942aa49f0c",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/pHFHsubQVpg_50.wav",
+      "prompt": "This is an amateur recording of a Bavarian folk music performance. The audio quality is not that great. There is a male vocalist singing in the lead. Then, brass elements start playing a cheerful tune. There is a festive atmosphere in this recording. It could be playing in the background at an Oktoberfest event.",
+      "exploratory": false
+    },
+    {
+      "sha": "78983363f0d4136aeaa4a68ea5c7dc3e9111db6d7f05bf469d9a716409c318ed",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/GxeDIuOzxmU_30.wav",
+      "prompt": "The low quality recording features an arpeggiated harp melody. It sounds emotional and passionate and the recording is noisy, in mono and a bit muffled.",
+      "exploratory": false
+    },
+    {
+      "sha": "073832a62ecf43830f2b731a4faa5f8d16a5c9eaa03df6d88e070e67c810f189",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/w4ayJNZ5w5o_280.wav",
+      "prompt": "The low quality recording features an electric guitar solo melody played with some sliding techniques. It sounds cool, passionate and the recording is noisy and in mono, as it was probably recorded with a phone.",
+      "exploratory": false
+    },
+    {
+      "sha": "02aff1c37122e101e1fdbab902b779f6535833aa21ed325ea1587f534eaac342",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/8fibq2VXibw_90.wav",
+      "prompt": "This is a festive music piece used as a theme for a cartoon. It is a slow tempo piece. There is a female vocalist singing melodically. The keyboard is playing the melody while the bass guitar is following in the background. The rhythm consists of a calm acoustic drum beat. The atmosphere is serene. This piece could be playing in the background at a slow dance event.",
+      "exploratory": false
+    },
+    {
+      "sha": "741b0500262388f0258e7785ccd6c1b0f9dc5c3b354e5ce92a0928c2b201f064",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/39MksqVeLdY_390.wav",
+      "prompt": "The low quality recording features a live performance where a DJ is playing his set. There are crowd noises in the background. The recording is noisy and it sounds manic, aggressive, distorted and upbeat.",
+      "exploratory": false
+    },
+    {
+      "sha": "ed763eee7d6fb2879d08b9b7acfa57ee7c5974f708ea494bab8fca06808f3e3c",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/rkQPSAHNoeI_170.wav",
+      "prompt": "This is an alternative rock music piece. There is a male vocalist singing melodically. The electric guitar is playing a simple and catchy tune while the bass guitar plays a groovy bass line in the background. The rhythm is provided by an acoustic drum beat. This piece could be used in the soundtrack of a teenage drama or a high school TV series.",
+      "exploratory": false
+    },
+    {
+      "sha": "75f5b901deb23fee8f68e83619b725ef4f768878bae6cdf02f9e6f8ade7150ef",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/ZGfGiVauGL4_0.wav",
+      "prompt": "The low quality recording features a sustained strings melody, mellow brass melody and wooden percussion one shot at the end of the loop. It sounds passionate, emotional and the sound is slowly fading in - which could mean that it is an intro section of the song.",
+      "exploratory": false
+    },
+    {
+      "sha": "76b8a49a2e27fd1188e4e6a45dfad5259faf376732017726a01f0e22f989aa86",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/-R0267o4lLk_60.wav",
+      "prompt": "You can hear two people playing various percussive instruments. One is holding the same beat playing on congas while the other is playing a solo changing rhythms and percussive sounds in a complex manner. This song may be playing live demonstrating a solo run.",
+      "exploratory": false
+    },
+    {
+      "sha": "341d999c6b129c7282c706f41f6e109fa76b59ef61e726225a7cb4ca8786b305",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/Lq0LMMZfHCU_140.wav",
+      "prompt": "The song is an instrumental piece. The song is  medium tempo with a casual piano accompaniment which is cheerful and jittery in style, along with violent sounds of a crash, crushing tones, metal clanging and rubber twisting sounds. The song is cheerful and at the same time has violent tones of injury and accident superimposed in it. The song is a background effect for an animated show which is violent in nature.",
+      "exploratory": false
+    },
+    {
+      "sha": "10922bb0c3f3548414d820ff05eca028b1588da0995a3b4aa3a2249e6b33f90e",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/sR8rlTIU8_Y_130.wav",
+      "prompt": "A male and female singer sing this vocal duet with a choral vocal harmony. The song is medium tempo with a groovy bass line, steady drumming rhythm, guitar lead, guitars playing rhythm and keyboard harmony. The song is devotional and congregational. The song is a Christian praise and worship song with poor audio quality.",
+      "exploratory": false
+    },
+    {
+      "sha": "6ed345f18bf63f13c0ce1e2b1235fa327f021c33964f0b6bcfea608d1b6d70b7",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/_qf0UiKtB3k_30.wav",
+      "prompt": "This is a classical music piece. The piece is being performed on a harpsichord. There is a sophisticated aura to it. The piece has a medieval sound. It would fit perfectly in the soundtrack of a historical drama movie that takes place in the medieval era. It could also work well as the opening theme for a literature YouTube channel.",
+      "exploratory": false
+    },
+    {
+      "sha": "36c111d043d5ef2c6f084e0b8e349a9fd559ba428b8889964d38396a268957b6",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/BM9XDXA-CUE_210.wav",
+      "prompt": "The low quality recording features a sound from a video game that consists of some footsteps sound effects and a wide mellow synth pad progression playing in the background. The synth pad volume ducks every time there is a synth bell melody, followed by synth bell sound effects. Sounds like a game with loud interactive gameplay sounds.",
+      "exploratory": false
+    },
+    {
+      "sha": "1988618fc3dfc9ef1fda6f7cd0ba6808f8dff70834f6177c444bebb525d59a91",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/0OY8XXZ98rw_30.wav",
+      "prompt": "The Metal song features a distorted flat male vocal singing over wide aggressive electric guitar riffs, distorted bass guitar, punchy snare, double pedal kick and shimmering cymbals. It sounds energetic, aggressive and manic - like something you would go into a mosh pit for.",
+      "exploratory": false
+    },
+    {
+      "sha": "ce2f5d40ffe27b5aeeeeb7e04e5e855ff9b1e142563b8d9d591917cb8e16a632",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/AdxKsUW2mAo_30.wav",
+      "prompt": "There is a meditative chant sung at a medium pitch by a female voice. In the background, an acoustic guitar plays a mellow tune while an ambient synth can be heard holding the bass notes of the chant. It has a peaceful atmosphere which makes it a perfect match for meditation sessions.",
+      "exploratory": false
+    },
+    {
+      "sha": "235f6b2aa41f5a48434cdc9259423fe878f7008ea0da4c886ef60c818f1e1154",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/ryEXhKy1QUI_60.wav",
+      "prompt": "Male voice over with a solo oboe melody in the background.",
+      "exploratory": false
+    },
+    {
+      "sha": "1d067a97d40a84c7bd44e7c8857c030f6f8b63233d976835117cc22a68147f6b",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/0zolXzR9Oi4_30.wav",
+      "prompt": "This is a classical music piece from the baroque era. The piece is being performed by a harpsichord. There is a mysterious atmosphere and a medieval feel to this piece. The music could fit very well in the soundtrack of a gothic horror movie, especially where we are witnessing a scene of exposition.",
+      "exploratory": false
+    },
+    {
+      "sha": "0fd9adab3f171823aee01cdd94c217e04b1a52869627892c1f0de2150d900186",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/WJORWlj6BW8_30.wav",
+      "prompt": "This clip features a low quality recording of a song played using a steel pan. There are no voices in this song. Other percussion instruments are played to emulate shakers and kick drums. The mood of this song is uplifting and happy. The song has a Caribbean influence. This is a song that can be played at a party.",
+      "exploratory": false
+    },
+    {
+      "sha": "c2dfa3ed66297e0a59eb2e032fbf8f99e30f88a6922317329b9d595b2884af73",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/MsEoUVWS59M_30.wav",
+      "prompt": "Sounds like a poorly recorded live sound check of an analog mono synthesizer. Low fidelity with ambient noise in the background.",
+      "exploratory": false
+    },
+    {
+      "sha": "f72c0907414ff3f717f0f7959f27524f20f4f7530cdffd092e31583ea988f0c2",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/8CY7G2NrlxY_30.wav",
+      "prompt": "A male singer sings this humming vocal. The song is medium tempo with a strong drumming rhythm, groovy bass slime, keyboard accompaniment, piano accompaniment and tambourine accompaniment . The song is emotional and romantic. The song is a modern pop love song with poor audio quality.",
+      "exploratory": false
+    },
+    {
+      "sha": "57837f11789dc681c30fd8b40ece3af709016ce70c18a1397b5f6ebd41ff8007",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/FFQVVwFjy7s_50.wav",
+      "prompt": "This is a drum & bass electronic music piece. There is no singer. There is a strong and fuzzy feeling bass sound. The rhythmic background consists of a loud and high tempo electronic drum beat. The atmosphere is modern and energetic. This piece could be playing at a nightclub or a dance club.",
+      "exploratory": false
+    },
+    {
+      "sha": "4ec6e88f87ff52012b5ce13138d8504847c66760b3b901f8b3d5b01b60497feb",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/tvcJENqxr1c_30.wav",
+      "prompt": "The low quality recording features a high pitched, sped up audio playing in the background, followed by arpeggiated electric guitar melody and smooth bass guitar. Even though the sped up audio sounds weird, the guitar melodies are emotional.",
+      "exploratory": false
+    },
+    {
+      "sha": "7794ab43ed4150e3d9f14e7190e92c57a636f5e9f1e36fd803a4d7d6c04272e3",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/dzPPmuFUicc_30.wav",
+      "prompt": "The low quality recording features a country song that consists of a passionate male vocal singing over arpeggiated acoustic guitar melody, acoustic rhythm guitar chords, mandoline guitar melody and groovy bass. It sounds passionate, joyful and emotional.",
+      "exploratory": false
+    },
+    {
+      "sha": "c018bffeb3edd3c9a466de74132f175ef7e285b6974ed6670803e7ff9bea65ed",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/MkPhe7TLLZ0_110.wav",
+      "prompt": "Music and random sounds from an old 8 bit video game. A children's melody interspersed with harsh, digitally distorted sounds. Experimental and dissonant to the point of being chaotic.",
+      "exploratory": false
+    },
+    {
+      "sha": "68e36da16ea6a72c86b895c0429fb50aa4431b42451565713cfba1171ca0d725",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/izVCz3P43p8_10.wav",
+      "prompt": "The low quality recording features a passionate electric guitar solo melody being played. It is a bit reverberant too.",
+      "exploratory": false
+    },
+    {
+      "sha": "6971054b553660f5b8b2d4ca01673e13ea4166566c694bab9b89db9eee5b6d3e",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/q7s7C4oNlFo_30.wav",
+      "prompt": "This is an intuitive folk/neo-folk music piece. There is a female vocalist singing over multiple tracks, one being the minor harmonies of the other. There is an acoustic guitar playing a gentle, simple tune. The atmosphere of this piece is heart-touching. The music could fit very well in the soundtrack of a drama movie or a TV show.",
+      "exploratory": false
+    },
+    {
+      "sha": "1cf785197e6d48ac65d6b9814a34c5588b8e488fd473ee87b1b1e7f54f03ecba",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/7_Sr2zv1sQc_80.wav",
+      "prompt": "The low quality recording features a traditional song that consists of passionate female vocal singing over sustained string melody, wobble bass, wooden percussive elements and shimmering shakers. It is a bit noisy, in mono and it sounds vintage, passionate, emotional and soulful.",
+      "exploratory": false
+    },
+    {
+      "sha": "cb1876374a86dea1d36455e3a63565a203f25cb9fe7baa22e2ac934a503fa939",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/M4yst1q1nlU_30.wav",
+      "prompt": "This is an instrumental rock piece which is a jingle for an ad. There is a clean electric guitar and a high-pitched keyboard playing the main melody. There is a mild bass guitar in the background supporting the melody. In the rhythmic background, there is a rock beat being played by the acoustic drums. A zipper sound effect can be heard synchronized with the ad. The atmosphere is very generic and calm. It is most suitable as an ad jingle or music behind a tutorial video.",
+      "exploratory": false
+    },
+    {
+      "sha": "2bf51a9b8dcf38d615c1ad38c78579b984e2fa9449031f543b29dacce9c18719",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/ZK5M3DZejzk_30.wav",
+      "prompt": "The commercial music features a groovy piano melody played over snare rolls in the first half of the loop. Right after, there is a drop that consists of a punchy \"4 on the floor\" kick pattern, shimmering hi hats, claps, groovy piano and wide synth lead melody. It sounds happy, fun, euphoric and exciting.",
+      "exploratory": false
+    },
+    {
+      "sha": "7517e08ce9327ebbfd4f7f69cfa02674c79ba9add203ddd615662b0205cd7717",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/n3QsFeGadEE_30.wav",
+      "prompt": "This song features synth sounds. There is no particular melody. There is no percussion and no voices. This sounds like sounds from outer space. When the first note is played, a ring modulated sound is played in the background. The same pattern is found in the third, fourth and fifth notes. This song can be played in a movie featuring an outer space theme.",
+      "exploratory": false
+    },
+    {
+      "sha": "684777e7945cb7dde452842b6d20afee143c30b904dd28e6bb8750d256f41579",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/qlWEAm4AUTU_370.wav",
+      "prompt": "Audio of a percussion instrument playing by itself. Sounds like a tambourine, riq, or pandeiro, playing a steady beat, alternating between a cymbal sound and a bongo drum sound.",
+      "exploratory": false
+    },
+    {
+      "sha": "c6430b03e75748127236460003648f40e3e0c840df876e0894afd3a7e695d441",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/mAmaUI7_uZ0_30.wav",
+      "prompt": "Amateur produced hip hop music with out of tune male and female vocals and amateur vocal production. The backing track is a trap beat with a synthesizer arpeggio.",
+      "exploratory": false
+    },
+    {
+      "sha": "4fcf96257df571018f42d974def1ff39e259f1cd29e04e87bb478a51d214eb47",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/B32m9Jqqrpo_30.wav",
+      "prompt": "The low quality recording features a DJ that scratches his vinyl hip hop song. The song consists of punchy snare and kick hits, bouncy hi hats and boomy bass. It is noisy, uptempo, energetic and it sounds a bit sloppy.",
+      "exploratory": false
+    },
+    {
+      "sha": "2254944392fe2ce0d02542bfc869e0915f655c97021d99857eedcec6c95bf7b8",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/WCifI6rwOoM_30.wav",
+      "prompt": "This jazz song features the main melody played on the piano. The double bass plays jazz basslines using half note intervals and jazz fills. The percussion plays a complicated jazz rhythm mostly focusing on the snare hits. Another percussion is played using sticks sounding like a congo. A male voice speaks some meaningless phrase. This song can be played in a bar.",
+      "exploratory": false
+    },
+    {
+      "sha": "694c7ce9f15ebafaa3fe66b6c246ae1956d3e835555e80871f10aae9e5b9ea89",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/5y2M_K3bUcQ_20.wav",
+      "prompt": "The low quality recording features a groovy didgeridoo melody playing over wooden percussion. The recording is noisy and in mono.",
+      "exploratory": false
+    },
+    {
+      "sha": "f24011a123fd91579eb4df0165aefb26a4d5a862f9bbd86ee91bffae7aa147ed",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/5iPTcL50mvw_30.wav",
+      "prompt": "The low quality recording features a chiptune remix of a pop song and it consists of high pitched female vocal singing over repetitive synth melody, punchy \"4 on the floor\" kick pattern and shimmering bells melody at the very beginning of the loop. It sounds kind of addictive, fun and happy. The audio sounds like it was stretched.",
+      "exploratory": false
+    },
+    {
+      "sha": "a6cc97166f55df7967848f98003f147c6bda809299ad19b0da993b9b193e1988",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/JFGNmPzPXeA_30.wav",
+      "prompt": "Someone is playing an acoustic drum groove with a snare that uses reverb. An e-bass is playing a sub bassline. An e-guitar is strumming short rhythmic chords on the backbeat giving this music its reggae vibe. A keyboard is playing a sound in the mid range and another keyboard responds with a countermelody playing a melody using a brass sound. In the background you can hear people talking. This song may be playing live at a festival.",
+      "exploratory": false
+    },
+    {
+      "sha": "df206498a2d2a2aaee24d351cf564581568c31415d08e550e640977856e1d6f5",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/BiqPn3d_dKM_150.wav",
+      "prompt": "This audio contains someone playing a very low sounding bass flute like instrument. Playing a rhythmic melody with a percussive sound created with the mouth. This song may be playing during a live performance from a busker.",
+      "exploratory": false
+    },
+    {
+      "sha": "85610ef03c82badf6bc6c9334536f39197afa433bcb058ce4c0db6fa132b3b77",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/Fsm-xDmyFKg_30.wav",
+      "prompt": "An acoustic drum is playing a fast groove with a kick-hit on every beat. The snare hit is full of reverb and panned to the right side of the speaker. A loud e-bass is playing a melody along with a clean e-guitar. A piano is playing a chord progression also adding a rhythmic element to the song. The male voice is singing in the mid range and gets support from backing voices that are barely noticeable. This song may be playing at a headshop.",
+      "exploratory": false
+    },
+    {
+      "sha": "dda8673e16ebbba80a573ec4bbad2eeb7752457e6bff6d427717d16c30aca6ab",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/GaNjXwElAUE_30.wav",
+      "prompt": "An acoustic drum is playing a straight groove while an e-bass is playing a bassline that reminds of reggae. This feeling gets enhanced by a e-guitar strumming a short rhythmic chord on the offbeat giving the song its typical reggae vibe. On top of that, someone is playing a melody on a steeldrums. This song may be playing at beachbar.",
+      "exploratory": false
+    },
+    {
+      "sha": "bfa10409464f0c7265fec90edfba389a959513c2e63d73109258e777bfc8bc29",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/LjxhswBV1UA_20.wav",
+      "prompt": "This song has a traditional Mexican mariachi sound. It is fun, vibrant and energetic and is led by rhythmic and melodic playing on the Mexican Vihuela. The maracas add an element of rhythmic percussion. There are sounds of laughter in the background.",
+      "exploratory": false
+    },
+    {
+      "sha": "af08be818db9c12d7205d0f118df31276582809f0a9b8c611cabf4da0e2213e4",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/ByOqw8M2U-Q_30.wav",
+      "prompt": "A female vocalist sings this melodious harmony. The tempo is slow with a dulcet Harp accompaniment . The song is soft, mellow, meditative, angelic, celestial,mystical, dreamy and mellifluous. This song is a Catholic prayer or salutation.",
+      "exploratory": false
+    },
+    {
+      "sha": "1823e00b04a850f7c0f60da90eee94a8a772b34b3c230d3e582b7a48c736effe",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/ikEuQPSBY-0_30.wav",
+      "prompt": "This song contains a piano playing a minor chord progression. In the background you can hear a synth lead pad playing kind of an easy arpeggio melody. Panned to the right side of the speakers you can hear strings playing a melody in the midrange. A male voice is singing in the midrange breaking his voice into headvoice. This song may be playing on loud speakers when alone at home.",
+      "exploratory": false
+    },
+    {
+      "sha": "74317412e1fd20f9f6745eac8cd9bde888c1051c0e2f75486c47c651d2102e99",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/1Xtkou9dtyA_370.wav",
+      "prompt": "The Alternative/Indie song features layered punchy kicks, energetic crash cymbals, groovy bass and synth key chords, followed by electric guitar licks. It sounds haunting and energetic, almost like a halloween themed song.",
+      "exploratory": false
+    },
+    {
+      "sha": "ee04d9f1aa85252ec2738c5cb82887bdc3aac8298785a2e4f80e1e6b536e848f",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/XE4NRSDLYG8_20.wav",
+      "prompt": "The song is an instrumental. The tempo is slow with a piano accompaniment and a strong bass line, with people clapping , whistling, and cheering. The song is being played at a live arena with people getting excited to the song introduction.",
+      "exploratory": false
+    },
+    {
+      "sha": "2feda2cd9e1d9c517c5ffaa86b866fccfbc552d17299c233ba2f98dc16176734",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/Dv21JlCT4_k_40.wav",
+      "prompt": "This is a Gregorian chant performed at a Christian Orthodox church setting. There is a female vocalist singing in the lead while a choir is singing in a hum-like manner at low-to-medium pitch. The atmosphere is religious and the character of the song is solemn. This piece can be used in the background at Orthodox religious events. It could also be playing in tragedy/aftermath of battle scenes in historical drama movies or TV shows with a Balkan/Eastern European setting.",
+      "exploratory": false
+    },
+    {
+      "sha": "6cd3ac701260a8ffd55b27574d61210c541668de2c00fc141fb830f3c2d48327",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/9PMoI31ncIs_30.wav",
+      "prompt": "This is a house music piece. There is a synth with a crisp sound playing the melody while a lot of turntable scratches can be heard in the background. An electronic drum beat with lots of snare beat repeat sounds provide the rhythm. The atmosphere is energetic and upbeat. This piece could be played at nightclubs or dance clubs.",
+      "exploratory": false
+    },
+    {
+      "sha": "8ad53c398f982f744cce835d79a47450b07d02e3e2abf5c5e2f1a420e69bf5f5",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/0u4gY1bBUwQ_250.wav",
+      "prompt": "This music is a lively instrumental. The tempo is fast with a drum beat introduction, saxophone solo, piano solo, followed with lively harmony of the tenor sax and march like drumming. This piece is the song introduction. It is a lively, cheerful, happy, celebratory and youthful Western Classical.",
+      "exploratory": false
+    },
+    {
+      "sha": "5563c023a4e90b9d64e2f4950703a24b2a52b6d65da1db377b047fe9c764b071",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/GrbrWNohr6Y_30.wav",
+      "prompt": "A female vocalist sings this mellow song. The tempo is slow with a subtle electric guitar accompaniment. The audio quality is inferior making it difficult to hear the song well. There is another track superimposed over the song which has sound so footsteps, metal being dragged, crickets, cricket chirping, breeze and some rustling. This is an audio of a song being played outdoors.",
+      "exploratory": false
+    },
+    {
+      "sha": "8088062b59e807320a27cc5c20cae194ceb6833e5298c26abd0e431246438309",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/9ZinCW4jTeE_30.wav",
+      "prompt": "Various percussive instruments are being played. In the foreground stays the cowbell. A trumpet is playing the lead melody while other trumpets are supporting along with a piano playing chords together with an organ sound. A steeldrum is ending the phrase of a melody with his own melody. An e-bass is playing a complex salsa groove. This song may be playing dancing salsa.",
+      "exploratory": false
+    },
+    {
+      "sha": "869f46b2e659ce982a482d1742a27fe28e2675d49f11e601acac7a2d01ab713c",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/WmyHFkyiiF8_20.wav",
+      "prompt": "The Classical song features a wide mellow strings melody and soft plucked strings melody. It sounds mellow, soft, emotional and epic, like a background movie soundtrack.",
+      "exploratory": false
+    },
+    {
+      "sha": "0fea88b020da95dcd2ace86c36c53ffb80e16ecaf9bb9692c350c2afb0b64e23",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/uLp6z37bfVE_230.wav",
+      "prompt": "A lot of very active church bells ringing together.",
+      "exploratory": false
+    },
+    {
+      "sha": "516268e97470787e4fe5f3b6d2bb6c83a0c3276ed22e204e35cc92f960db6b31",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/jzij1UX73kU_30.wav",
+      "prompt": "The low quality recording features an ambient song that consists of a wide sustained synth pad, followed by mellow sustained strings. It sounds relaxing, calming and like something you would listen to in a yoga session.",
+      "exploratory": false
+    },
+    {
+      "sha": "703a57b4a81b036c916c72dcbe964d1a2a2ac25ab5b514605a7e7ef633283a58",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/YMq4wE6KxmQ_30.wav",
+      "prompt": "A synth pad is playing an evolving drone chord along with some glittering sounds. In the background of the recording you can hear wind, running and birds chirping. The whole scenario sounds calming and meditative. This song may be playing for a documentary.",
+      "exploratory": false
+    },
+    {
+      "sha": "5739c2b3e7517a021695ba94dfe65b26c9c32fe59ae670d3c3fe41f8fa8a40d2",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/bTLgeqCaYMY_0.wav",
+      "prompt": "The low quality recording features groovy drums played on vinyl, judging by the wide vinyl crackles and scratching effect. There is also a buzzy static noise, right after the female laugh that can be heard in the background. Sounds like it is recorded with a phone.",
+      "exploratory": false
+    },
+    {
+      "sha": "a471c2a070683716b0c9a3f62ab0d7a83769fb335c91111958bd8e4cbb722b9f",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/ZAT2_-x59pY_10.wav",
+      "prompt": "This audio contains someone playing a rhythm using acoustic drum samples along with synth pad sounds with a lot of reverb creating harmonies and a melody. This song may be playing and producing music at home.",
+      "exploratory": false
+    },
+    {
+      "sha": "b2eb87c9f44f6ffc5b761db7e5776bf9c82fe63a0f123a60a73012eba8fc2747",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/xUVvBF9BWdg_30.wav",
+      "prompt": "A male singer sings this jazz melody with the backup singer in vocal harmony. The song is medium tempo, with saxophone harmony, ska drumming rhythm and a good bass line. The song is entertaining and groovy. The song is a classic jazz tune played in ska style.",
+      "exploratory": false
+    },
+    {
+      "sha": "2314a58f2ef42c97a0a2580dfec7bd78e41796cac14b1aa958752bc26dca560c",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/nBSMh7pgn2o_170.wav",
+      "prompt": "Chipmunk style pitched up male vocals over a slow rock drum beat, sliding electric bass guitar, acoustic guitar and bongos. Heavy use of delay on the vocal.",
+      "exploratory": false
+    },
+    {
+      "sha": "ce1e7e2bf94bb809f30bb355134d45a1688003cc08cc2cc5a35811cbcc38dcae",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/Ts3ZcUaELzA_30.wav",
+      "prompt": "Someone is playing a distorted e-guitar melody in the lower mid-range. This song may be playing at home practicing guitar.",
+      "exploratory": false
+    },
+    {
+      "sha": "5f2f1fb98f722f4037049e26af05e555a089346313d54f439d92f012a0692bbc",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/VlXi2TxMXbc_130.wav",
+      "prompt": "This is a live recording of a musician playing a Chinese flute, otherwise known as a dizi. It is a calming and melodic piece - and you could imagine yourself walking peacefully through marshlands or grasslands. Though the melody is enchanting, the audio quality is average - with a slight fuzzy buzz present in the background.",
+      "exploratory": false
+    },
+    {
+      "sha": "48c111bade703dc603624b71a44ee2ad4a7596d3da68d0f23067c8ffce4b03b4",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/4EwWBI-tHLk_30.wav",
+      "prompt": "This music is a lively harmony of the brass and wind instruments. The tempo is fast with lively tuba, trombone, trumpet, clarinet with mandolin and resonator accompaniment and busking percussion that sounds like scratching. His music is loud, vibrant, perky, engaging and animated street busking.",
+      "exploratory": false
+    },
+    {
+      "sha": "cee96cc2d3127be5d6f7feeab920392f93e86ba0cbb853b2cc5ff6b03d381fff",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/kkjNpwNcMWI_190.wav",
+      "prompt": "A female vocalist sings this spirited song. The tempo is fast with an animated keyboard harmony, groovy bass lines, electric  guitar, tenor and alto saxophone accompaniment, enthusiastic drumming and tambourine beats with vocal backup. The song is energetic, upbeat, youthful, enthusiastic with emphatic vocals. This song is contemporary alternative rock.",
+      "exploratory": false
+    },
+    {
+      "sha": "25a28741e2185ff7adbc7dff65e833c60d16835e1b8a9412bca0b9713dc37296",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/BMxgDBoPv_0_0.wav",
+      "prompt": "This music is a soft instrumental. The tempo is slow with a beautiful keyboard harmony. The music is soft, mellow, sentimental, nostalgic, melancholic and romantic. This song is classic pop.",
+      "exploratory": false
+    },
+    {
+      "sha": "787109a4bf7ec47b9236ccdc75e513200a043b0eb8e15458efa4359b62739594",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/GYx6HNQbP1w_30.wav",
+      "prompt": "The song is an instrumental. The tempo is medium with a strong drumming rhythm, keyboard harmony, string synth harmony, guitar lead and a bass guitar shadowing the melody line in harmony. The song has rock music influences with a sense of mystery and adventure. The song is a soundtrack for an adventure sports documentary.",
+      "exploratory": false
+    },
+    {
+      "sha": "72636d2ffa897a5f422b489f1d8ff8a712a57814d9c6774cead52e82b2656ba9",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/mjZylz3nCwQ_230.wav",
+      "prompt": "The low quality recording features an orchestral music played by wide violin melody and low cello. It sounds emotional and passionate - like something you would hear in old cartoons.",
+      "exploratory": false
+    },
+    {
+      "sha": "1041943657e22748171178479484266f8e41ad2c8f1f2cf1132c1ab4bbe45fe4",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/Y8plCTF8xsY_20.wav",
+      "prompt": "The low quality recording features a live performance of an orchestra playing sustained brass melody, shimmering cymbals and sustained strings melody. It sounds muddy and muffled, as it was probably recorded with a poor quality microphone, but also passionate. The recording is noisy and in mono.",
+      "exploratory": false
+    },
+    {
+      "sha": "bbed30fdef50d7c8adfeafd6cc07f7c10a7c77878f26ed37edccec3ec35ab4ff",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/qxWVr67g6yY_200.wav",
+      "prompt": "This is the live performance of a pop music piece. It is an amateur recording. There are male vocals singing melodically. An electric guitar strums a chord for the ending of a song while the sounds of the cymbals can be heard from the acoustic drums. The cheers of the crowd can be heard even more than the music itself. This recording could be sampled for use in beat-making.",
+      "exploratory": false
+    },
+    {
+      "sha": "ed447ffea339c8f56a9c70c62b07a515dc030e2a6815abbb0fbdad1a22415b24",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/0ewQiU3q5jM_30.wav",
+      "prompt": "This file contains audio playing a high pitched melody on a music box. The melody sounds a little freighting and is full of reverb. From the recording you can hear a little bit of white noise. This song may be playing in a horror movie scene.",
+      "exploratory": false
+    },
+    {
+      "sha": "6980397f7edb74adc525126ce1971ba40a0f31bace787a432f8cc7cadb9b4b6f",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/3u9OO9Og0Gc_50.wav",
+      "prompt": "This is a live performance of an R&B music piece. There is a female vocalist singing melodically in the lead. Three female supporting vocals can be heard singing in the back. The melody is being played by the piano while the bass guitar plays a groovy bass line. The rhythm is provided by an acoustic drum beat. The atmosphere is sentimental. This piece can be used in the soundtrack of a romance movie involving a couple in a long distance relationship.",
+      "exploratory": false
+    },
+    {
+      "sha": "2cce0b6e26a853ff871281425dbc51e3122a9ab67f635c804cf5b86822016bc1",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/Gj6etuzTWlQ_30.wav",
+      "prompt": "The low quality recording features a harmonized kids' vocals singing over a muffled flute melody. The recording is very noisy and it is in mono, but regardless it sounds happy and fun.",
+      "exploratory": false
+    },
+    {
+      "sha": "ae0c2d4d70b6be40396d7854c1eb8671a90901bebd23670e08512053368dd147",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/W2KaBnoGxek_30.wav",
+      "prompt": "The Ambient song features wide synth pad chords, mellow piano melody and some sea waves sounds. It sounds relaxing and calming, like something you would hear in yoga sessions.",
+      "exploratory": false
+    },
+    {
+      "sha": "1fbcc8e7917cd4feb4e8e74711f597229860ada527699ec4862c2ed629afb028",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/MHHshnnqyco_220.wav",
+      "prompt": "This is a live performance of a Khaliji music piece. There is an orchestra performing the piece. The melody is being played by the oud and the violin. The rhythmic background is composed of various percussive elements such as the riq, the darbuka and performers clapping their hands. The atmosphere is vibrant. This piece could be playing in the background at an Arab cuisine restaurant.",
+      "exploratory": false
+    },
+    {
+      "sha": "66c6083a05cd783e6c2ed651c52adc95ae9d46aec859f1bd02a4b6da2da942ac",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/EkMgPJfSL04_30.wav",
+      "prompt": "This audio contains someone playing a piece of music on a harp. The piece sounds dreamy and peaceful. There is some reverb from the room in the recording. This song may be playing for a soft indie-video-game.",
+      "exploratory": false
+    },
+    {
+      "sha": "b8df1a49d51bd00266091442f193cd5d52f959739784f2e6a0dff026966b40ff",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/40sAH2ZB0Pg_30.wav",
+      "prompt": "Someone is playing an acoustic guitar strumming chords on the backbeat along with a banjo doing the same. A slide guitar is playing a melody along. An upright bass is playing a simple bassline. Two female voices are singing as a duo. The second one creates harmony in the higher register. This song is an amateur recording. This song may be playing at a local event.",
+      "exploratory": false
+    },
+    {
+      "sha": "3e201f7389c5de68f58fee9ab59495326220a0fb6a176f8ca99e1dda8ad33ef9",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/2_mFg42LlUI_70.wav",
+      "prompt": "The low quality recording features a huge church organ chord progression, followed by shimmering cymbals, played in a huge reverberant space - most likely a church. It sounds epic and powerful.",
+      "exploratory": false
+    },
+    {
+      "sha": "639a2af34ea4b056f6a74d47b6ae95fa11095fb8ee053a057fe2147b12d31bc9",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/WFPGA_BYkKU_30.wav",
+      "prompt": "This song is an instrumental. The tempo is slow with the music starting with the sound of blasts,sinister melody of chimes , muddled sounds,sound of water or bubbles, and synthesised arrangements with beeps at the end of this clip.It is animated, sinister, chaotic with discordant music.",
+      "exploratory": false
+    },
+    {
+      "sha": "ba3b993c6da9d59caf00ce68a4467749f1536d176661413382d7bcc73114559d",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/dsVzafZik3c_90.wav",
+      "prompt": "This is an R&B/hip-hop music piece. There is a female vocalist singing melodically. The melody is being played by the keyboard which has a crisp sound. There is a strong bass sound in the background. The rhythm is provided by a loud acoustic drum beat. The atmosphere is hip and urban. This piece could be used in the soundtrack of a drama movie that takes place in the big city.",
+      "exploratory": false
+    },
+    {
+      "sha": "89dc738d050149d997ac0f58e3261f1c89d3535094e02a575d79527ffcae97cb",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/VkXLtUx-RmI_300.wav",
+      "prompt": "This audio contains crickets chirping. Then someone starts playing a digital accordion. This is an amateur recording.",
+      "exploratory": false
+    },
+    {
+      "sha": "69b8b2e1eb549cbda8bf8a5a6f7443d5ca71ea46c2e1ac8d98c93edfc3dfa523",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/QJzveo6IBsU_0.wav",
+      "prompt": "The low quality recording features an orchestra music that contains haunting sizzling bells melody, low wooden percussions, sustained strings melody and sustained brass melody. It sounds suspenseful and intense, as background music for movies would sound.",
+      "exploratory": false
+    },
+    {
+      "sha": "b03c9c52ec63cdc328abd518558c28b884fce5a3d47e8362dea52e91744f13a4",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/p2fXNAPYD20_60.wav",
+      "prompt": "The low quality recording features an ambient song that consists of a wide filter modulate synth pad melody going, wide mellow synth pad and short growly synth bass. At the end of the loop, there is a reverberant riser, subtly bringing the energy up. It sounds calming and relaxing.",
+      "exploratory": false
+    },
+    {
+      "sha": "e6112668de29128bac35dddb3630a79423ec50f3be537e676562aa4161a8c6d5",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/6jdeSAmkzEU_30.wav",
+      "prompt": "Someone is playing a distorted e-guitar solo melody with a lot of reverb over another e-guitar finger picking chords. This is an amateur recording. This song may be playing guitar at home.",
+      "exploratory": false
+    },
+    {
+      "sha": "7225d1753b76e684db9a6bd4241acd70beb29a240a938078ff0e834585b13d1d",
+      "ref": "runs/Benchmark/_data/musiccaps/ref/AagemOzvoZE_30.wav",
+      "prompt": "This song is a romantic duet. The tempo is medium with a plethora of instruments like the auto harp, fiddle, acoustic guitar, electric guitar, bass guitar, banjo,intense drumming, cello, violin harmony and vocal harmony. The song is a romantic, charming,emotional, passionate love song. The instrumentation style and music decibels indicate that this is the climax of a country love song.",
+      "exploratory": false
+    }
+  ]
+}
