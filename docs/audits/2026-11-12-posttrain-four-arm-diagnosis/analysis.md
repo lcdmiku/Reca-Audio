@@ -48,4 +48,6 @@ AudioCaps 取 89 个唯一音频 SHA 各一条 caption，其中 8 个与探索�
 
 四个 checkpoint 的完整 SHA256、文件大小、任务序列 SHA256、部署版本及确定性样本列表见同目录 `protocol.json`。四组 checkpoint 已在 smoke 中通过 DiT 加载，原始存储精度的参数检查及相对 L2 结果见 `parameter_drift.md`。
 
+正式 geometry 已核验 192 条记录。三组文本条件在 CFG=1 时已经偏离 Base 约 13%，CFG=6 扩大到约 30%。因此当前证据支持 CFG 会放大模型变化，也表明变化并非只发生在 null 分支。该结果来自固定 latent 的单步预测，不能替代生成 sweep。分模态表见 `cfg_sweep.md`。
+
 Smoke 以 2 步完成了四组各八种设置、每种两个样本的生成，以及两种条件的 geometry 和评分入口。正式输出位于服务器 `/home/linchudeng/Reca-Audio/runs/audits/posttrain_four_arm_v1/`，launcher 日志为同名 `.launcher.log`。正式结果和各评测表由服务器在 100 步生成、完整性核验和评分后写出。当前分析中的历史值、smoke 数值及正式配对指标分开使用。
