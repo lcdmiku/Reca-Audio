@@ -1,0 +1,621 @@
+{
+  "contract": {
+    "selection": "runs/audits/dit_block_swap_v1/results.json",
+    "mix": "runs/train/reca_long_matrix_b_10s_v1/mix/dit_exposure2000.pt",
+    "groups": [
+      {
+        "group_id": "2296044efa0c7bbd1142858d4399cd3d2cd2cc8e526306b3467ce9d54dd9ac03",
+        "audio_sha256": "2296044efa0c7bbd1142858d4399cd3d2cd2cc8e526306b3467ce9d54dd9ac03",
+        "row_index": 0,
+        "audio": "/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/full2/ref/103549.wav",
+        "captions": [
+          "Constant rattling noise and sharp vibrations"
+        ]
+      },
+      {
+        "group_id": "7ddc174e8a45f297f3861e040c8358e1aad3b05fe014d595af7972387a815a61",
+        "audio_sha256": "7ddc174e8a45f297f3861e040c8358e1aad3b05fe014d595af7972387a815a61",
+        "row_index": 1,
+        "audio": "/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/full2/ref/103542.wav",
+        "captions": [
+          "Food is frying, and a woman talks"
+        ]
+      },
+      {
+        "group_id": "02c6545686556e141557c85c107605b74cb12639b2bfea4318feb43c367514a9",
+        "audio_sha256": "02c6545686556e141557c85c107605b74cb12639b2bfea4318feb43c367514a9",
+        "row_index": 2,
+        "audio": "/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/full2/ref/103938.wav",
+        "captions": [
+          "Thunder and a gentle rain"
+        ]
+      },
+      {
+        "group_id": "5f3cd64ee5ab9514bed41df57c977f46d2912e035891a60ad75240ac993bac75",
+        "audio_sha256": "5f3cd64ee5ab9514bed41df57c977f46d2912e035891a60ad75240ac993bac75",
+        "row_index": 3,
+        "audio": "/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/full2/ref/104275.wav",
+        "captions": [
+          "An infant crying followed by a man laughing"
+        ]
+      },
+      {
+        "group_id": "9acee4ad9f3e78d1919fe8d97090a0db127a23a193540b3f98bb28055cf3dec5",
+        "audio_sha256": "9acee4ad9f3e78d1919fe8d97090a0db127a23a193540b3f98bb28055cf3dec5",
+        "row_index": 4,
+        "audio": "/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/full2/ref/102945.wav",
+        "captions": [
+          "Ocean waves crashing in the distance as young girl talks followed by a young man talking while a group of children laughs in the background and wind blows into a microphone"
+        ]
+      },
+      {
+        "group_id": "ccc224e2d0417f24dffa364bf5598db8db7d4eb9ad4d30b136ddb3584f702d47",
+        "audio_sha256": "ccc224e2d0417f24dffa364bf5598db8db7d4eb9ad4d30b136ddb3584f702d47",
+        "row_index": 5,
+        "audio": "/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/full2/ref/103705.wav",
+        "captions": [
+          "Motorboat engine screams as it accelerates"
+        ]
+      },
+      {
+        "group_id": "c2a1f9d277dd889693d183416b5b880c8260a3405aa2f18f054a8f19c3828c8f",
+        "audio_sha256": "c2a1f9d277dd889693d183416b5b880c8260a3405aa2f18f054a8f19c3828c8f",
+        "row_index": 6,
+        "audio": "/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/full2/ref/107284.wav",
+        "captions": [
+          "Bells ring followed by humming and vibrations as a train passes while blowing a horn"
+        ]
+      },
+      {
+        "group_id": "67de60ab3ccd385376cbe497b5bc23ab83d61e60266394e8f9991495ef1b8ec2",
+        "audio_sha256": "67de60ab3ccd385376cbe497b5bc23ab83d61e60266394e8f9991495ef1b8ec2",
+        "row_index": 7,
+        "audio": "/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/full2/ref/103478.wav",
+        "captions": [
+          "Several birds chirp with some hissing"
+        ]
+      }
+    ],
+    "arms": {
+      "base": null,
+      "mix": null,
+      "mix_base_middle": [
+        12,
+        24
+      ],
+      "mix_base_all": [
+        0,
+        36
+      ]
+    },
+    "steps": 100,
+    "cfg": 6.0,
+    "seconds": 10,
+    "seed_base": 1234,
+    "dtype": "float16",
+    "original_sample_size": 485100,
+    "sample_size": 441000,
+    "sample_rate": 44100,
+    "downsampling_ratio": 2048
+  },
+  "rows": [
+    {
+      "arm": "base",
+      "index": 0,
+      "sha": "2296044efa0c7bbd1142858d4399cd3d2cd2cc8e526306b3467ce9d54dd9ac03",
+      "prompt": "Constant rattling noise and sharp vibrations",
+      "seed": 1235,
+      "out": "runs/audits/dit_generation_swap_v1/base/00.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.016826378996484,
+      "clap": 0.28186970669467626,
+      "shuffled_clap": 0.007088225359322159
+    },
+    {
+      "arm": "base",
+      "index": 1,
+      "sha": "7ddc174e8a45f297f3861e040c8358e1aad3b05fe014d595af7972387a815a61",
+      "prompt": "Food is frying, and a woman talks",
+      "seed": 1236,
+      "out": "runs/audits/dit_generation_swap_v1/base/01.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 21.68308865604922,
+      "clap": 0.4075443644009923,
+      "shuffled_clap": -0.055402668930130086
+    },
+    {
+      "arm": "base",
+      "index": 2,
+      "sha": "02c6545686556e141557c85c107605b74cb12639b2bfea4318feb43c367514a9",
+      "prompt": "Thunder and a gentle rain",
+      "seed": 1237,
+      "out": "runs/audits/dit_generation_swap_v1/base/02.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 21.783089175936766,
+      "clap": 0.45108860808833057,
+      "shuffled_clap": -0.03129121910551424
+    },
+    {
+      "arm": "base",
+      "index": 3,
+      "sha": "5f3cd64ee5ab9514bed41df57c977f46d2912e035891a60ad75240ac993bac75",
+      "prompt": "An infant crying followed by a man laughing",
+      "seed": 1238,
+      "out": "runs/audits/dit_generation_swap_v1/base/03.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 21.819647624972276,
+      "clap": 0.5592563196939687,
+      "shuffled_clap": 0.05727631438920413
+    },
+    {
+      "arm": "base",
+      "index": 4,
+      "sha": "9acee4ad9f3e78d1919fe8d97090a0db127a23a193540b3f98bb28055cf3dec5",
+      "prompt": "Ocean waves crashing in the distance as young girl talks followed by a young man talking while a group of children laughs in the background and wind blows into a microphone",
+      "seed": 1239,
+      "out": "runs/audits/dit_generation_swap_v1/base/04.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 21.96953871694859,
+      "clap": 0.35321197911102226,
+      "shuffled_clap": 0.18434933954821892
+    },
+    {
+      "arm": "base",
+      "index": 5,
+      "sha": "ccc224e2d0417f24dffa364bf5598db8db7d4eb9ad4d30b136ddb3584f702d47",
+      "prompt": "Motorboat engine screams as it accelerates",
+      "seed": 1240,
+      "out": "runs/audits/dit_generation_swap_v1/base/05.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.025661121006124,
+      "clap": 0.37939989345552505,
+      "shuffled_clap": 0.043119909956729895
+    },
+    {
+      "arm": "base",
+      "index": 6,
+      "sha": "c2a1f9d277dd889693d183416b5b880c8260a3405aa2f18f054a8f19c3828c8f",
+      "prompt": "Bells ring followed by humming and vibrations as a train passes while blowing a horn",
+      "seed": 1241,
+      "out": "runs/audits/dit_generation_swap_v1/base/06.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.032309749047272,
+      "clap": 0.51483914800477,
+      "shuffled_clap": 0.07836597466011988
+    },
+    {
+      "arm": "base",
+      "index": 7,
+      "sha": "67de60ab3ccd385376cbe497b5bc23ab83d61e60266394e8f9991495ef1b8ec2",
+      "prompt": "Several birds chirp with some hissing",
+      "seed": 1242,
+      "out": "runs/audits/dit_generation_swap_v1/base/07.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 21.987758542993106,
+      "clap": 0.5335090520974239,
+      "shuffled_clap": 0.07979381224220941
+    },
+    {
+      "arm": "mix",
+      "index": 0,
+      "sha": "2296044efa0c7bbd1142858d4399cd3d2cd2cc8e526306b3467ce9d54dd9ac03",
+      "prompt": "Constant rattling noise and sharp vibrations",
+      "seed": 1235,
+      "out": "runs/audits/dit_generation_swap_v1/mix/00.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.02971257700119,
+      "clap": 0.3579894046007566,
+      "shuffled_clap": 0.015926158743430157
+    },
+    {
+      "arm": "mix",
+      "index": 1,
+      "sha": "7ddc174e8a45f297f3861e040c8358e1aad3b05fe014d595af7972387a815a61",
+      "prompt": "Food is frying, and a woman talks",
+      "seed": 1236,
+      "out": "runs/audits/dit_generation_swap_v1/mix/01.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.04552608600352,
+      "clap": 0.6029473758653221,
+      "shuffled_clap": -0.040617745527516645
+    },
+    {
+      "arm": "mix",
+      "index": 2,
+      "sha": "02c6545686556e141557c85c107605b74cb12639b2bfea4318feb43c367514a9",
+      "prompt": "Thunder and a gentle rain",
+      "seed": 1237,
+      "out": "runs/audits/dit_generation_swap_v1/mix/02.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.10910300805699,
+      "clap": 0.4565268878228034,
+      "shuffled_clap": -0.016186410465473637
+    },
+    {
+      "arm": "mix",
+      "index": 3,
+      "sha": "5f3cd64ee5ab9514bed41df57c977f46d2912e035891a60ad75240ac993bac75",
+      "prompt": "An infant crying followed by a man laughing",
+      "seed": 1238,
+      "out": "runs/audits/dit_generation_swap_v1/mix/03.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.103723765001632,
+      "clap": 0.5884977695232863,
+      "shuffled_clap": 0.030967228665758705
+    },
+    {
+      "arm": "mix",
+      "index": 4,
+      "sha": "9acee4ad9f3e78d1919fe8d97090a0db127a23a193540b3f98bb28055cf3dec5",
+      "prompt": "Ocean waves crashing in the distance as young girl talks followed by a young man talking while a group of children laughs in the background and wind blows into a microphone",
+      "seed": 1239,
+      "out": "runs/audits/dit_generation_swap_v1/mix/04.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.10954444401432,
+      "clap": 0.39824900526786816,
+      "shuffled_clap": 0.08611606403102286
+    },
+    {
+      "arm": "mix",
+      "index": 5,
+      "sha": "ccc224e2d0417f24dffa364bf5598db8db7d4eb9ad4d30b136ddb3584f702d47",
+      "prompt": "Motorboat engine screams as it accelerates",
+      "seed": 1240,
+      "out": "runs/audits/dit_generation_swap_v1/mix/05.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.12175862910226,
+      "clap": 0.4005716192437226,
+      "shuffled_clap": 0.047340481187092366
+    },
+    {
+      "arm": "mix",
+      "index": 6,
+      "sha": "c2a1f9d277dd889693d183416b5b880c8260a3405aa2f18f054a8f19c3828c8f",
+      "prompt": "Bells ring followed by humming and vibrations as a train passes while blowing a horn",
+      "seed": 1241,
+      "out": "runs/audits/dit_generation_swap_v1/mix/06.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.078036041930318,
+      "clap": 0.29111379776519153,
+      "shuffled_clap": -0.020747254477370233
+    },
+    {
+      "arm": "mix",
+      "index": 7,
+      "sha": "67de60ab3ccd385376cbe497b5bc23ab83d61e60266394e8f9991495ef1b8ec2",
+      "prompt": "Several birds chirp with some hissing",
+      "seed": 1242,
+      "out": "runs/audits/dit_generation_swap_v1/mix/07.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.099053354002535,
+      "clap": 0.5199361008494269,
+      "shuffled_clap": 0.020072915744292257
+    },
+    {
+      "arm": "mix_base_middle",
+      "index": 0,
+      "sha": "2296044efa0c7bbd1142858d4399cd3d2cd2cc8e526306b3467ce9d54dd9ac03",
+      "prompt": "Constant rattling noise and sharp vibrations",
+      "seed": 1235,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_middle/00.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.05483467609156,
+      "clap": 0.3452480300437548,
+      "shuffled_clap": -9.514687362836144e-05
+    },
+    {
+      "arm": "mix_base_middle",
+      "index": 1,
+      "sha": "7ddc174e8a45f297f3861e040c8358e1aad3b05fe014d595af7972387a815a61",
+      "prompt": "Food is frying, and a woman talks",
+      "seed": 1236,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_middle/01.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.11696558399126,
+      "clap": 0.4958203844087473,
+      "shuffled_clap": -0.02788632162999271
+    },
+    {
+      "arm": "mix_base_middle",
+      "index": 2,
+      "sha": "02c6545686556e141557c85c107605b74cb12639b2bfea4318feb43c367514a9",
+      "prompt": "Thunder and a gentle rain",
+      "seed": 1237,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_middle/02.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.115163063048385,
+      "clap": 0.4636013714639485,
+      "shuffled_clap": -0.016162891988590944
+    },
+    {
+      "arm": "mix_base_middle",
+      "index": 3,
+      "sha": "5f3cd64ee5ab9514bed41df57c977f46d2912e035891a60ad75240ac993bac75",
+      "prompt": "An infant crying followed by a man laughing",
+      "seed": 1238,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_middle/03.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.043069754960015,
+      "clap": 0.5868267524591724,
+      "shuffled_clap": 0.03866715244972796
+    },
+    {
+      "arm": "mix_base_middle",
+      "index": 4,
+      "sha": "9acee4ad9f3e78d1919fe8d97090a0db127a23a193540b3f98bb28055cf3dec5",
+      "prompt": "Ocean waves crashing in the distance as young girl talks followed by a young man talking while a group of children laughs in the background and wind blows into a microphone",
+      "seed": 1239,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_middle/04.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.13384779705666,
+      "clap": 0.44445628984378843,
+      "shuffled_clap": 0.07563954622696355
+    },
+    {
+      "arm": "mix_base_middle",
+      "index": 5,
+      "sha": "ccc224e2d0417f24dffa364bf5598db8db7d4eb9ad4d30b136ddb3584f702d47",
+      "prompt": "Motorboat engine screams as it accelerates",
+      "seed": 1240,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_middle/05.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.11532439396251,
+      "clap": 0.3934223245548294,
+      "shuffled_clap": 0.03859087433326032
+    },
+    {
+      "arm": "mix_base_middle",
+      "index": 6,
+      "sha": "c2a1f9d277dd889693d183416b5b880c8260a3405aa2f18f054a8f19c3828c8f",
+      "prompt": "Bells ring followed by humming and vibrations as a train passes while blowing a horn",
+      "seed": 1241,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_middle/06.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.095268921926618,
+      "clap": 0.2234217797409329,
+      "shuffled_clap": -0.011225904965164443
+    },
+    {
+      "arm": "mix_base_middle",
+      "index": 7,
+      "sha": "67de60ab3ccd385376cbe497b5bc23ab83d61e60266394e8f9991495ef1b8ec2",
+      "prompt": "Several birds chirp with some hissing",
+      "seed": 1242,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_middle/07.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.141975889913738,
+      "clap": 0.5517625700294224,
+      "shuffled_clap": 0.09933671320233514
+    },
+    {
+      "arm": "mix_base_all",
+      "index": 0,
+      "sha": "2296044efa0c7bbd1142858d4399cd3d2cd2cc8e526306b3467ce9d54dd9ac03",
+      "prompt": "Constant rattling noise and sharp vibrations",
+      "seed": 1235,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_all/00.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.01877763203811,
+      "clap": 0.2570989584858482,
+      "shuffled_clap": -0.02931307304927348
+    },
+    {
+      "arm": "mix_base_all",
+      "index": 1,
+      "sha": "7ddc174e8a45f297f3861e040c8358e1aad3b05fe014d595af7972387a815a61",
+      "prompt": "Food is frying, and a woman talks",
+      "seed": 1236,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_all/01.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.104035775992088,
+      "clap": 0.4089955195511671,
+      "shuffled_clap": -0.035884322104619705
+    },
+    {
+      "arm": "mix_base_all",
+      "index": 2,
+      "sha": "02c6545686556e141557c85c107605b74cb12639b2bfea4318feb43c367514a9",
+      "prompt": "Thunder and a gentle rain",
+      "seed": 1237,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_all/02.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.123255113954656,
+      "clap": 0.4451048840155054,
+      "shuffled_clap": -0.03704971695551301
+    },
+    {
+      "arm": "mix_base_all",
+      "index": 3,
+      "sha": "5f3cd64ee5ab9514bed41df57c977f46d2912e035891a60ad75240ac993bac75",
+      "prompt": "An infant crying followed by a man laughing",
+      "seed": 1238,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_all/03.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.12551170401275,
+      "clap": 0.606354192283056,
+      "shuffled_clap": 0.025531903926608566
+    },
+    {
+      "arm": "mix_base_all",
+      "index": 4,
+      "sha": "9acee4ad9f3e78d1919fe8d97090a0db127a23a193540b3f98bb28055cf3dec5",
+      "prompt": "Ocean waves crashing in the distance as young girl talks followed by a young man talking while a group of children laughs in the background and wind blows into a microphone",
+      "seed": 1239,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_all/04.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.203604388982058,
+      "clap": 0.37944548539338574,
+      "shuffled_clap": 0.08200238524923911
+    },
+    {
+      "arm": "mix_base_all",
+      "index": 5,
+      "sha": "ccc224e2d0417f24dffa364bf5598db8db7d4eb9ad4d30b136ddb3584f702d47",
+      "prompt": "Motorboat engine screams as it accelerates",
+      "seed": 1240,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_all/05.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.12674328801222,
+      "clap": 0.3703901648956832,
+      "shuffled_clap": 0.06410031347904108
+    },
+    {
+      "arm": "mix_base_all",
+      "index": 6,
+      "sha": "c2a1f9d277dd889693d183416b5b880c8260a3405aa2f18f054a8f19c3828c8f",
+      "prompt": "Bells ring followed by humming and vibrations as a train passes while blowing a horn",
+      "seed": 1241,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_all/06.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.145276161958463,
+      "clap": 0.4479162039939837,
+      "shuffled_clap": 0.11943744614642282
+    },
+    {
+      "arm": "mix_base_all",
+      "index": 7,
+      "sha": "67de60ab3ccd385376cbe497b5bc23ab83d61e60266394e8f9991495ef1b8ec2",
+      "prompt": "Several birds chirp with some hissing",
+      "seed": 1242,
+      "out": "runs/audits/dit_generation_swap_v1/mix_base_all/07.wav",
+      "duration": 9.984580498866213,
+      "frames": 440320,
+      "sample_rate": 44100,
+      "generation_seconds": 22.108308924012817,
+      "clap": 0.5261660181993953,
+      "shuffled_clap": 0.12279926434974832
+    }
+  ],
+  "summary": {
+    "base": {
+      "mean_clap": 0.4350898839433387,
+      "per_sample": [
+        0.28186970669467626,
+        0.4075443644009923,
+        0.45108860808833057,
+        0.5592563196939687,
+        0.35321197911102226,
+        0.37939989345552505,
+        0.51483914800477,
+        0.5335090520974239
+      ],
+      "mean_shuffled_clap": 0.04541246101502001,
+      "delta_base": 0.0,
+      "delta_mix": -0.016889111173958547,
+      "wins_vs_mix": 2
+    },
+    "mix": {
+      "mean_clap": 0.4519789951172972,
+      "per_sample": [
+        0.3579894046007566,
+        0.6029473758653221,
+        0.4565268878228034,
+        0.5884977695232863,
+        0.39824900526786816,
+        0.4005716192437226,
+        0.29111379776519153,
+        0.5199361008494269
+      ],
+      "mean_shuffled_clap": 0.015358929737654478,
+      "delta_base": 0.016889111173958547,
+      "delta_mix": 0.0,
+      "wins_vs_mix": 0
+    },
+    "mix_base_middle": {
+      "mean_clap": 0.4380699378180745,
+      "per_sample": [
+        0.3452480300437548,
+        0.4958203844087473,
+        0.4636013714639485,
+        0.5868267524591724,
+        0.44445628984378843,
+        0.3934223245548294,
+        0.2234217797409329,
+        0.5517625700294224
+      ],
+      "mean_shuffled_clap": 0.024608002594363815,
+      "delta_base": 0.0029800538747358774,
+      "delta_mix": -0.01390905729922267,
+      "wins_vs_mix": 3
+    },
+    "mix_base_all": {
+      "mean_clap": 0.43018392835225305,
+      "per_sample": [
+        0.2570989584858482,
+        0.4089955195511671,
+        0.4451048840155054,
+        0.606354192283056,
+        0.37944548539338574,
+        0.3703901648956832,
+        0.4479162039939837,
+        0.5261660181993953
+      ],
+      "mean_shuffled_clap": 0.03895302513020671,
+      "delta_base": -0.004905955591085559,
+      "delta_mix": -0.021795066765044106,
+      "wins_vs_mix": 3
+    }
+  }
+}
