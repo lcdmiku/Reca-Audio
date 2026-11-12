@@ -25,12 +25,14 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--train-root", type=Path, required=True)
     parser.add_argument("--groups", type=int, default=8)
-    parser.add_argument("--swap", action="store_true", help="Compare Base/Mix weight swaps")
+    swaps = parser.add_mutually_exclusive_group()
+    swaps.add_argument("--swap", action="store_true", help="Compare Base/Mix weight swaps")
+    swaps.add_argument("--block-swap", action="store_true", help="Restore complete Base block ranges in Mix")
     args = parser.parse_args()
     if args.groups < 2 or args.out.exists():
         parser.error("need at least two groups and a fresh output path")
     random.seed(42)
-    if args.swap:
+    if args.swap or args.block_swap:
         torch.manual_seed(42)
     dataset = AudioManifestDataset(args.manifest, seconds=10)
     groups = select_groups(dataset, args.groups, 1)
@@ -75,6 +77,22 @@ def main():
         handles.append(layer.cross_attn.register_forward_hook(hook(f"attention:{index}")))
     try:
         arms = ("base", "pure", "mix")
+        block_ranges = {}
+        if args.block_swap:
+            if len(layers) != 36:
+                raise ValueError("block-swap protocol expects 36 DiT layers")
+            block_ranges = {
+                "mix_base_blocks_0_11": (0, 12),
+                "mix_base_blocks_12_23": (12, 24),
+                "mix_base_blocks_24_35": (24, 36),
+                "mix_base_blocks_all": (0, 36),
+            }
+            arms = ("base", "mix", *block_ranges)
+            mix_state = _load_checkpoint(args.train_root / "mix" / "dit_exposure2000.pt")["dit"]
+            base_blocks = [
+                {key: value.cpu().clone() for key, value in layer.state_dict().items()}
+                for layer in layers
+            ]
         if args.swap:
             arms = ("base", "base_mix_embed", "mix", "mix_base_embed",
                     "mix_base_early_attention", "mix_base_embed_early_attention")
@@ -90,7 +108,14 @@ def main():
                 for name, module in modules.items()
             }
         for arm in arms:
-            if args.swap:
+            if args.block_swap:
+                if arm != "base":
+                    # Reset the entire model so previous interventions cannot leak.
+                    dit.load_state_dict(mix_state, strict=True)
+                    if arm in block_ranges:
+                        for i in range(*block_ranges[arm]):
+                            layers[i].load_state_dict(base_blocks[i], strict=True)
+            elif args.swap:
                 if arm == "mix":
                     dit.load_state_dict(mix_state, strict=True)
                 elif arm != "base":
@@ -148,7 +173,10 @@ def main():
             handle.remove()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("x", encoding="utf-8") as handle:
-        json.dump({"seed": 42, "swap": args.swap, "early_attention_layers": list(range(6)) if args.swap else [],
+        json.dump({"seed": 42, "swap": args.swap, "block_swap": args.block_swap,
+                   "block_ranges_start_inclusive_end_exclusive": block_ranges,
+                   "manifest": args.manifest, "train_root": str(args.train_root),
+                   "early_attention_layers": list(range(6)) if args.swap else [],
                    "groups": groups, "rows": rows}, handle, allow_nan=False)
 
 
