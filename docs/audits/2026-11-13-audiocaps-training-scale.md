@@ -10,15 +10,18 @@
 
 ## 固定训练配置
 
-两个 T2A-only 组均从原始 Audio-Omni 出发，各使用 2000 micro-batch、累积 4、500 次计划更新。继续使用 10 秒输入、fp32 主权重、AMP fp16、Adafactor、峰值 LR 2e-5、100 曝光 warmup、原曝光索引 cosine 曲线和 CFG dropout 0。Qwen 和 Audio VAE 冻结。两组共用原 T2A-only 的逐曝光数据、flow 与 prompt 随机种子，按相同均匀随机数映射到各自池中的音频索引。大池在固定 2000 曝光下只会访问其中一部分，比较检验的是固定训练预算下扩大样本池的效果。
+更新后的正式矩阵包括 7070 条的 Pure、T2A-only、Mix 及 707 条的同源 T2A-only。四组均从原始 Audio-Omni 出发，各使用 7072 micro-batch、累积 4、1768 次计划更新。继续使用 10 秒输入、fp32 主权重、AMP fp16、Adafactor、峰值 LR 2e-5、352 曝光 warmup、曝光索引 cosine 曲线和 CFG dropout 0。Qwen 和 Audio VAE 冻结。三个大池组共享同一无放回的音频遍历和逐曝光随机种子。Mix 每次更新含两条 ReCA 和两条 T2A，共各 3536 次曝光。小池以独立的无放回遍历重复约十轮，使用相同逐曝光随机种子和优化配置。
 
-训练过程继续使用同一历史诊断 manifest 和 0/1000/2000 曝光检查点。正式生成比较应沿用固定的 89-SHA AudioCaps prompt、其中 81 个主要分析 SHA、441000 窗口、100 步及配对 seed。优先比较 CFG=6 的大池减小池 CLAP，再检查 CFG=1，区分提升是否延伸到 conditional 生成。
+7072 是覆盖 7070 条且整除累积步长 4 的最小曝光量。它用于检验见过一轮大池后的变化，收敛所需训练量仍需验证。0、2000、4000、7072 曝光记录同一历史 held-out 的 loss 和梯度诊断；仅保存最终 checkpoint。7072 曝光矩阵与历史 2000 曝光实验的训练预算和采样方式不同，数据规模效应主要由本轮同源的两组 T2A-only 在等预算下识别。Pure/Mix 是相同大池上的任务对照，Mix 的单任务剂量只有各纯任务组的一半。
+
+正式生成比较沿用固定的 89-SHA AudioCaps prompt、其中 81 个主要分析 SHA、441000 窗口、100 步及配对 seed。优先比较 CFG=6 的大池减小池 CLAP，再检查 CFG=1；Pure/Mix 同时比较音频条件重建。
 
 ## 服务器位置
 
 - 数据与 `audit.json`：`/home/linchudeng/Reca-Audio/runs/Benchmark/_data/audiocaps/official_train_scale_v1/`
-- 队列日志：`/home/linchudeng/Reca-Audio/runs/train/audiocaps_scale_t2a_v1.launcher.log`
-- 训练日志：`/home/linchudeng/Reca-Audio/runs/train/audiocaps_scale_t2a_v1/t2a_{707,7070}.log`
-- 最终权重：`/home/linchudeng/Reca-Audio/runs/train/audiocaps_scale_t2a_v1/t2a_{707,7070}/dit_exposure2000.pt`
+- 下载日志：`/home/linchudeng/Reca-Audio/runs/train/audiocaps_scale_t2a_v1.launcher.log`
+- 新队列日志：`/home/linchudeng/Reca-Audio/runs/train/audiocaps_scale_matrix_v2.launcher.log`
+- 训练日志与实际覆盖率：`/home/linchudeng/Reca-Audio/runs/train/audiocaps_scale_matrix_v2/` 下的各组 `.log` 和 `coverage.json`
+- 最终权重：各组子目录中的 `dit_exposure7072.pt`
 
-数据准备通过后由同一队列检查空闲 GPU 并启动两个训练组。预估用户目录占用约 370–380 GiB，含两组最终 checkpoint。
+下载完成后由新队列检查磁盘与 GPU 空闲状态。三个大池组先用三对 GPU 并行启动，小池 T2A-only 在大池 T2A-only 完成后复用 GPU。按旧 checkpoint 大小为四组终点权重预留磁盘空间。若预计超过 400 GiB，队列在训练前退出。

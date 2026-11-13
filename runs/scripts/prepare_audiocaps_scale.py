@@ -187,12 +187,68 @@ def prepare(out, count, small_count):
     print(json.dumps(pools), flush=True)
 
 
+def coverage_schedules(data, out):
+    """Use one shared traversal for the three large-pool arms."""
+    audit = json.loads((data / "audit.json").read_text(encoding="utf-8"))
+    if any(audit["heldout_intersection"].values()):
+        raise ValueError("training pool intersects the held-out set")
+    total = 7072
+    shared = random.Random(SEED)
+    seeds = [
+        {key: shared.randrange(2**63) for key in ("data_seed", "flow_seed", "prompt_seed")}
+        for _ in range(total)
+    ]
+    coverage = {}
+    for size, arms in ((707, ("t2a_707",)), (7070, ("pure_7070", "t2a_7070", "mix_7070"))):
+        manifest = data / f"train_{size}.jsonl"
+        if sha(manifest.read_bytes()) != audit["pools"][str(size)]["manifest_sha256"]:
+            raise ValueError(f"training manifest digest mismatch: {manifest}")
+        rows = jsonl(manifest)
+        if len(rows) != size or len({row["sha256"] for row in rows}) != size:
+            raise ValueError(f"unexpected manifest size or duplicate audio: {manifest}")
+        rng = random.Random(SEED)
+        order = []
+        while len(order) < total:
+            epoch = list(range(size))
+            rng.shuffle(epoch)
+            order.extend(epoch)
+        order = order[:total]
+        # Allocate exactly two exposures of each task in each optimizer update.
+        task_rng = random.Random(SEED)
+        mix = []
+        for _ in range(total // 4):
+            tasks = ["reca", "reca", "t2a", "t2a"]
+            task_rng.shuffle(tasks)
+            mix.extend(tasks)
+        for arm in arms:
+            tasks = mix if arm.startswith("mix") else ["reca" if arm.startswith("pure") else "t2a"] * total
+            records = [
+                dict(seeds[i], exposure=i + 1, sample_index=index, task=tasks[i])
+                for i, index in enumerate(order)
+            ]
+            path = out / f"{arm}_schedule.jsonl"
+            digest = write_schedule(path, records)
+            path.with_suffix(".jsonl.sha256").write_text(digest + "\n", encoding="utf-8")
+            coverage[arm] = dict(
+                manifest=str(manifest), schedule_sha256=digest,
+                exposures=dict(Counter(tasks)), unique_audio=len(set(order)),
+                unique_audio_by_task={task: len({i for i, t in zip(order, tasks) if t == task})
+                                      for task in sorted(set(tasks))},
+            )
+    save_json(out / "coverage.json", coverage)
+    print(json.dumps(coverage), flush=True)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--count", type=int, default=7070)
     parser.add_argument("--small-count", type=int, default=707)
+    parser.add_argument("--coverage-data", type=Path)
     args = parser.parse_args()
     if not 0 < args.small_count < args.count:
         parser.error("require 0 < small-count < count")
-    prepare(args.out, args.count, args.small_count)
+    if args.coverage_data is None:
+        prepare(args.out, args.count, args.small_count)
+    else:
+        coverage_schedules(args.coverage_data, args.out)
