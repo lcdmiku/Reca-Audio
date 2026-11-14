@@ -129,7 +129,8 @@ def set_arm(dit, protocol, arm):
         return
     meta = protocol["checkpoints"][arm]
     checkpoint = _load_checkpoint(Path(meta["path"]))
-    if checkpoint["exposure"] != 2000 or checkpoint["optimizer_step"] != 500:
+    if (checkpoint["exposure"] != meta.get("exposure", 2000)
+            or checkpoint["optimizer_step"] != meta.get("optimizer_step", 500)):
         raise ValueError(f"incorrect checkpoint exposure or update count: {arm}")
     if "schedule_sha256" in meta and checkpoint["schedule_digest"] != meta["schedule_sha256"]:
         raise ValueError(f"checkpoint schedule mismatch: {arm}")
@@ -162,13 +163,15 @@ def move_condition(raw):
 
 
 @torch.inference_mode()
-def generate(root, shard, shards):
+def generate(root, shard, shards, *, skip_base=False):
     protocol = load_protocol(root)
     torch.manual_seed(42)
     api = AudioOmni(str(CONFIG), str(BASE), device="cuda:0", conditioner_device="cuda:1", dtype="float16")
     dataset = AudioManifestDataset(protocol["test_manifest"], seconds=10)
     cached = {}
     for arm in ARMS:
+        if skip_base and arm == "base":
+            continue
         set_arm(api.model.model, protocol, arm)
         for setting, (domain, size, cfg) in SETTINGS.items():
             items = protocol["music" if domain == "music" else "audio"]
@@ -380,14 +383,19 @@ def score(root):
     for arm in ARMS:
         for label, a, b in [("duration_11_minus_10", "audio_11_cfg6", "audio_10_cfg6"),
                             ("reca_matched_minus_mismatched", "reca_matched", "reca_mismatched")]:
+            if a not in results or b not in results:
+                continue
             rows = results[a][arm]["rows"]
             mask = [i for i, row in enumerate(rows) if not row["exploratory"]]
             comparisons.setdefault(label, {})[arm] = paired(
                 np.array([rows[i]["clap"] for i in mask]),
                 np.array([results[b][arm]["rows"][i]["clap"] for i in mask]), [rows[i] for i in mask])
-    write_json(root / "results.json", dict(protocol=protocol, generation=results, paired_contrasts=comparisons,
-                                          geometry=json.loads((root / "geometry.json").read_text()),
-                                          parameter_drift=json.loads((root / "parameter_drift.json").read_text())))
+    payload = dict(protocol=protocol, generation=results, paired_contrasts=comparisons)
+    for key in ("geometry", "parameter_drift"):
+        path = root / f"{key}.json"
+        if path.exists():
+            payload[key] = json.loads(path.read_text())
+    write_json(root / "results.json", payload)
 
 
 def main():
