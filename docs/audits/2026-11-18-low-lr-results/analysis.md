@@ -43,4 +43,5 @@ Pure、Mix 的**匹配减错配**优势，再相对 T2A-only 做同 SHA 的配�
 CLAP 差值区间采用按音频 SHA 的 10,000 次配对 bootstrap，未校正多重比较，不包含训练 seed 间的不确定性。81 条主集已用于多轮比较，不视为全新的独立确认集。重建 LSD 与分布指标用 89 条，不能与 81 条的配对 CLAP 逐条解释。
 
 - [完整指标](metrics.md) · [本轮逐条结果](results.json) · [高 LR 原始报告](../2026-11-15-audiocaps-scale-results/analysis.md) · [训练设置与固定诊断](../2026-11-17-low-lr.md)
+- [感知音质盲听：参与方法、题本与评分回收](listening.md)
 - 服务器：`/home/linchudeng/Reca-Audio/runs/audits/audiocaps_low_lr_eval_v1/`；评分文件 SHA256：`852c5c459ec89f8b0a4e8ead80fa53fa8903e227b84c62e0d883362c24369b20`。
