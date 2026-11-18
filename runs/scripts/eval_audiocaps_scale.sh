@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-out="${1:-runs/audits/audiocaps_scale_eval_v2}"
+eval_args=()
+default_out=runs/audits/audiocaps_scale_eval_v2
+if [[ "${1:-}" == --low-lr ]]; then
+    shift
+    eval_args+=(--low-lr)
+    default_out=runs/audits/audiocaps_low_lr_eval_v1
+fi
+out="${1:-$default_out}"
 python="${PYTHON_BIN:-$HOME/miniconda3/envs/audio-omni/bin/python}"
 export PYTHONPATH="$PWD/src:$PWD/Audio-Omni:${PYTHONPATH:-}"
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
@@ -26,7 +33,7 @@ done
 run() {
     local pair="$1"
     shift
-    CUDA_VISIBLE_DEVICES="$pair" "$python" -u runs/scripts/eval_audiocaps_scale.py "$@" --out "$out"
+    CUDA_VISIBLE_DEVICES="$pair" "$python" -u runs/scripts/eval_audiocaps_scale.py "$@" --out "$out" "${eval_args[@]}"
 }
 run 1,2 prepare
 pids=()
