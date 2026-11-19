@@ -32,7 +32,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--schedule-digest", default="")
     parser.add_argument(
         "--task-mode",
-        choices=["random_mix", "pure", "t2a", "balanced_mix"],
+        choices=["random_mix", "pure", "t2a", "balanced_mix", "reca_then_t2a"],
         default="random_mix",
     )
     parser.add_argument("--prepare-only", action="store_true")
@@ -73,6 +73,10 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("total-exposures must be positive")
     if not 0 <= args.warmup_exposures < args.total_exposures:
         raise ValueError("warmup-exposures must be in [0, total-exposures)")
+    if args.task_mode == "reca_then_t2a" and (
+        args.prepare_only or args.arm != "b" or args.total_exposures % 8
+    ):
+        raise ValueError("reca_then_t2a requires an external two-phase schedule and complete arm-B updates")
     if args.prepare_only:
         _helpers().validate_experiment_shape(args.total_exposures, accumulation=4)
         return
@@ -186,6 +190,11 @@ def _run(args: argparse.Namespace) -> int:
     schedule = helpers.load_schedule(args.schedule, expected_digest=digest)
     if len(schedule) != args.total_exposures:
         raise ValueError("schedule length does not match total exposures")
+    if args.task_mode == "reca_then_t2a" and any(
+        row["exposure"] != index + 1 or row["task"] != ("reca" if index < len(schedule) // 2 else "t2a")
+        for index, row in enumerate(schedule)
+    ):
+        raise ValueError("schedule does not match the ReCA then T2A contract")
 
     device = torch.device(args.device)
     cond_device = torch.device(args.conditioner_device)
