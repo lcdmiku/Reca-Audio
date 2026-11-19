@@ -3,10 +3,17 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 eval_args=()
 default_out=runs/audits/audiocaps_scale_eval_v2
+entry=runs/scripts/eval_audiocaps_scale.py
+reserve_kib=$((4 * 1024 * 1024))
 if [[ "${1:-}" == --low-lr ]]; then
     shift
     eval_args+=(--low-lr)
     default_out=runs/audits/audiocaps_low_lr_eval_v1
+elif [[ "${1:-}" == --reca-then-t2a ]]; then
+    shift
+    entry=runs/scripts/eval_reca_then_t2a.py
+    default_out=runs/audits/audiocaps_reca_then_t2a_eval_v1
+    reserve_kib=$((2 * 1024 * 1024))
 fi
 out="${1:-$default_out}"
 python="${PYTHON_BIN:-$HOME/miniconda3/envs/audio-omni/bin/python}"
@@ -18,7 +25,6 @@ export QWEN_OMNI_MODEL_PATH="${QWEN_OMNI_MODEL_PATH:-$(find "$HOME/.cache/huggin
 test -s "$CLAP_CKPT"
 test -d "$QWEN_OMNI_MODEL_PATH"
 test ! -e "$out"
-reserve_kib=$((4 * 1024 * 1024))
 test "$(df -Pk "$HOME" | awk 'NR==2 {print $4}')" -gt "$reserve_kib"
 test "$(du -sk "$HOME" | cut -f1)" -lt $((400 * 1024 * 1024 - reserve_kib))
 
@@ -33,7 +39,7 @@ done
 run() {
     local pair="$1"
     shift
-    CUDA_VISIBLE_DEVICES="$pair" "$python" -u runs/scripts/eval_audiocaps_scale.py "$@" --out "$out" "${eval_args[@]}"
+    CUDA_VISIBLE_DEVICES="$pair" "$python" -u "$entry" "$@" --out "$out" "${eval_args[@]}"
 }
 run 1,2 prepare
 pids=()

@@ -9,3 +9,18 @@
 切换前在 3,536 曝光增加一次不更新参数的固定诊断，另保留原诊断位置 0/2000/4000/7072。由于存储预算仅保留最终 checkpoint，不主张已得到中点生成能力证据。评测时主要与 5e-6 Mix 对齐输入、seed、采样参数，比较 AudioCaps CFG=6 T2A 的配对 CLAP、CLAP-FAD/PANNs FD 等指标；Base 判断是否有净提升，Pure、T2A-only 为上下文。CFG=1、MusicCaps CFG=6、正确/错配音频重建补充解释。若目标是证明音频预训练本身有益，还需匹配末段文本样本和 LR 的无音频预训练对照。本轮不同时启动反向顺序或其它对照。
 
 启动脚本：`runs/scripts/train_audiocaps_reca_then_t2a.sh`。服务器输出根：`/home/linchudeng/Reca-Audio/runs/train/audiocaps_reca_then_t2a_v1/`。主日志：`sequential_7070.log`；逐步指标：`sequential_7070/metrics.jsonl`；终点：`sequential_7070/dit_exposure7072.pt`。历史组和盲听结果不覆写。
+
+## 实际切换与终点
+
+北京时间 11 月 19 日 16:49 完成。1,768 条训练更新记录的曝光号和非空任务 loss 均已核对，前 884 条仅有 ReCA loss，后 884 条仅有 T2A loss。终点文件 12,162,313,930 字节，训练端标记 reload_validated。相同的 8 个固定诊断样本：
+
+| 模型位置 | ReCA Flow MSE | T2A Flow MSE | DiT 相对 Base 漂移 |
+|---|---:|---:|---:|
+| Base | 0.946485 | 0.934343 | 0 |
+| 顺序组切换前（3,536） | 0.929807 | 0.930538 | 0.9160% |
+| 顺序组终点（7,072） | 0.929003 | 0.928534 | 0.9427% |
+| 低 LR Mix 终点（7,072） | 0.929032 | 0.928669 | 0.9486% |
+
+第二段训练后，两种诊断 MSE 都比切换点低；终点与 Mix 的文本 MSE 相差仅约 0.000135。该诊断不代表 AudioCaps 生成 CLAP 或音质，也没有中点生成结果。
+
+生成评测入口：`bash runs/scripts/eval_audiocaps_scale.sh --reca-then-t2a`。独立输出 `runs/audits/audiocaps_reca_then_t2a_eval_v1/`，复用现有对照，只新增 445 条顺序组音频（五种设置 × 89）。主对比为同 LR 顺序组减交错 Mix，主要终点为 AudioCaps CFG=6 未参与早期探索的 81 个 SHA。完整性判据为评分完成标记 `COMPLETE` 和 `results.json`。
