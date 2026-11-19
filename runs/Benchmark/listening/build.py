@@ -38,7 +38,7 @@ def select(results):
         eligible.sort(key=lambda idx: hashlib.sha256(
             ("quality-pilot-v1:" + domain + ":" + rows[idx]["sha"]).encode()).digest())
         for idx in eligible[:8]:
-            group = dict(domain=domain, sha=rows[idx]["sha"], clips=[])
+            group = dict(domain=domain, sha=rows[idx]["sha"], prompt=rows[idx]["prompt"], clips=[])
             for arm in ARMS:
                 row = data[setting][arm]["rows"][idx]
                 if any(row[key] != rows[idx][key] for key in ("sha", "prompt", "seed", "frames", "source_sha", "exploratory")):
@@ -142,9 +142,66 @@ def build(selected, source_dir, root):
                           max_dbtp=max(c["output_dbtp"] for c in clips), clips=len(clips))))
 
 
+def add_prompt_forms(selected, root):
+    master = root / "private"
+    sources = json.loads((master / "sources.json").read_text(encoding="utf-8"))
+    if sources["results_sha256"] != SOURCE:
+        raise ValueError("Private source manifest is not from this evaluation")
+    prompts = {(block["domain"], block["sha"]): block for block in selected}
+    sources_by_sha = {(block["domain"], block["sha"]): block for block in sources["blocks"]}
+    template = Path(__file__).with_name("index.html")
+    prefix, flag = "globalThis.LISTENING_PACK = ", "\nglobalThis.HAS_ALIGNMENT = true;"
+    for form in ("A", "B"):
+        folder = root / ("form-" + form)
+        key = json.loads((master / ("key-" + form + ".json")).read_text(encoding="utf-8"))
+        manifest = folder / "pack.js"
+        packed = manifest.read_text(encoding="utf-8").strip().removesuffix(flag)
+        if not packed.startswith(prefix) or not packed.endswith(";"):
+            raise ValueError("Unexpected public form format")
+        public = json.loads(packed[len(prefix):-1])
+        if public["pack_id"] != key["pack_id"] or len(public["blocks"]) != len(selected):
+            raise ValueError("Form does not match key")
+        captions, paths, seen = {}, [], set()
+        for visible, hidden in zip(public["blocks"], key["blocks"], strict=True):
+            ident = (hidden["domain"], hidden["sha"])
+            reference = prompts[ident]
+            if visible["id"] != hidden["id"] or ident in seen or visible["id"] in captions:
+                raise ValueError("Duplicate or inconsistent block")
+            seen.add(ident)
+            sources_by_arm = {clip["arm"]: clip for clip in sources_by_sha[ident]["clips"]}
+            original = {clip["arm"]: clip for clip in reference["clips"]}
+            if {clip["arm"] for clip in hidden["clips"]} != set(ARMS) or len(visible["clips"]) != len(ARMS):
+                raise ValueError("Unexpected arm assignments")
+            for item, assignment in zip(visible["clips"], hidden["clips"], strict=True):
+                source = sources_by_arm[assignment["arm"]]
+                src = item["src"]
+                if (item["id"] != assignment["id"] or source["src"] != src
+                        or not re.fullmatch(r"audio/[a-f0-9]{20}\.wav", src)
+                        or source["path"] != original[assignment["arm"]]["path"]
+                        or source["seed"] != original[assignment["arm"]]["seed"]
+                        or digest(folder / src) != source["output_sha256"]):
+                    raise ValueError("Clip does not match its generated source")
+                paths.append(src)
+            captions[visible["id"]] = reference["prompt"]
+        if len(set(paths)) != 64 or not all(isinstance(v, str) and v.strip() for v in captions.values()):
+            raise ValueError("Incomplete listening form")
+        (folder / "prompts.js").write_text("globalThis.LISTENING_PROMPTS = " +
+            json.dumps({"pack_id": public["pack_id"], "prompts": captions}, ensure_ascii=True) + ";", encoding="utf-8")
+        manifest.write_text(packed + flag, encoding="utf-8")
+        for page in ("index.html", "alignment.html"):
+            shutil.copyfile(template, folder / page)
+        archive = root / ("listening-with-prompts-" + form + ".zip")
+        temp = archive.with_suffix(".zip.tmp")
+        with zipfile.ZipFile(temp, "w", zipfile.ZIP_STORED) as bundle:
+            for name in ["index.html", "alignment.html", "pack.js", "prompts.js", *paths]:
+                bundle.write(folder / name, name)
+        temp.replace(archive)
+        print(f"{archive.name}: {len(captions)} original prompts, {len(paths)} verified clips")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("phase", choices=("list", "build"))
+    parser.add_argument("phase", choices=("list", "build", "with-prompts"))
     parser.add_argument("--results", required=True, type=Path)
     parser.add_argument("--source-dir", type=Path)
     parser.add_argument("--out", type=Path)
@@ -152,6 +209,10 @@ if __name__ == "__main__":
     selection = select(args.results)
     if args.phase == "list":
         print("\n".join(c["path"] for b in selection for c in b["clips"]))
+    elif args.phase == "with-prompts":
+        if args.out is None:
+            parser.error("with-prompts requires an existing --out form directory")
+        add_prompt_forms(selection, args.out)
     else:
         if args.source_dir is None or args.out is None:
             parser.error("build requires --source-dir and --out")

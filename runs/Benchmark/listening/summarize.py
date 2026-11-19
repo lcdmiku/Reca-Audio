@@ -77,13 +77,16 @@ def estimate(values):
     return {"mean": statistics.mean(values), "sha_ci95": ci}
 
 
-def summarize(keys, files):
+def summarize(keys, files, *, alignment=False):
     forms, arms = validate_keys(keys)
+    dimension = "alignment" if alignment else "quality"
     submissions = set()
     scores = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list))))
     tags = defaultdict(Counter)
     for path in files:
         rating = load(path)
+        if rating.get("dimension", "quality") != dimension:
+            raise ValueError(f"{path}: expected a {dimension} submission")
         pack = string(rating, "pack_id")
         rater = string(rating, "rater_id").casefold()
         if re.fullmatch(r"[a-z0-9_-]{3,32}", rater, flags=re.ASCII) is None:
@@ -99,19 +102,24 @@ def summarize(keys, files):
                 raise ValueError(f"{path}: missing or unknown clips in {ident}")
             for clip_id, arm in expected.items():
                 clip = given[clip_id]
-                quality = clip["quality"]
-                if type(quality) is not int or not 1 <= quality <= 5 or clip.get("heard") is not True:
+                if ("quality" if alignment else "alignment") in clip:
+                    raise ValueError(f"{path}: mixed rating dimensions in {ident}/{clip_id}")
+                score = clip[dimension]
+                if type(score) is not int or not 1 <= score <= 5 or clip.get("heard") is not True:
                     raise ValueError(f"{path}: incomplete score or playback for {ident}/{clip_id}")
-                selected = clip["tags"]
-                if (not isinstance(selected, list) or not all(isinstance(tag, str) and tag in ARTIFACT_TAGS for tag in selected)
+                selected = clip.get("tags", []) if alignment else clip["tags"]
+                if (not isinstance(selected, list) or (alignment and selected)
+                        or not all(isinstance(tag, str) and tag in ARTIFACT_TAGS for tag in selected)
                         or len(selected) != len(set(selected))):
                     raise ValueError(f"{path}: invalid artifact tags for {ident}/{clip_id}")
-                scores[domain][sha][arm][rater].append(quality)
+                scores[domain][sha][arm][rater].append(score)
                 tags[domain, arm].update(selected)
         submissions.add((pack, rater))
+    labels = {"dimension": dimension} if alignment else {}
     if not submissions:
-        return {"status": "awaiting_ratings", "submissions": 0, "raters": 0, "domains": {}}
+        return {**labels, "status": "awaiting_ratings", "submissions": 0, "raters": 0, "domains": {}}
     report = {
+        **labels,
         "status": "scored", "submissions": len(submissions),
         "raters": len({rater for _, rater in submissions}),
         "method": "Average repeats within listener/SHA/arm, then listeners within SHA, then weight each SHA equally. "
@@ -127,14 +135,15 @@ def summarize(keys, files):
             by_arm[arm] = [statistics.mean(statistics.mean(repeats) for repeats in group.values()) for group in groups]
             domain_raters.update(rater for group in groups for rater in group)
             per_arm[arm] = dict(estimate(by_arm[arm]),
-                                raw_ratings=sum(len(repeats) for group in groups for repeats in group.values()),
-                                artifact_tag_counts=dict(tags[domain, arm]))
+                                raw_ratings=sum(len(repeats) for group in groups for repeats in group.values()))
+            if not alignment:
+                per_arm[arm]["artifact_tag_counts"] = dict(tags[domain, arm])
         comparisons = {}
         for right, left in itertools.combinations(order, 2):
             deltas = [lhs - rhs for lhs, rhs in zip(by_arm[left], by_arm[right])]
             comparisons[f"{left}_minus_{right}"] = estimate(deltas)
         report["domains"][domain] = {"audio_sha": len(items), "raters": len(domain_raters),
-                                      "arms": per_arm, "paired_quality_differences": comparisons}
+                                      "arms": per_arm, f"paired_{dimension}_differences": comparisons}
     return report
 
 
@@ -143,9 +152,10 @@ def main():
     parser.add_argument("--key", type=Path, action="append", required=True)
     parser.add_argument("ratings", type=Path, nargs="*")
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--alignment", action="store_true", help="Read caption alignment ratings instead of quality.")
     args = parser.parse_args()
     try:
-        result = summarize(args.key, args.ratings)
+        result = summarize(args.key, args.ratings, alignment=args.alignment)
     except (KeyError, TypeError, ValueError, OSError) as exc:
         parser.error(str(exc))
     text = json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False)

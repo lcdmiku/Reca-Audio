@@ -14,20 +14,23 @@ input{accent-color:#176357}.choices label:has(:checked),.tags label:has(:checked
 button,.file{font:inherit;border:1px solid #839d92;border-radius:6px;background:white;padding:8px 12px;color:#174e40;cursor:pointer}
 .primary{background:#185f50;color:white;border-color:#185f50}button:disabled{cursor:not-allowed;opacity:.45}:focus-visible{outline:3px solid #a85415;outline-offset:2px}
 .file input{max-width:220px}.warning{color:#893b15;font-weight:600}.status{font-size:.9rem}.actions{margin:10px 0}progress{width:100%;accent-color:#176357}
+#promptBox{margin:12px 0;padding:12px 16px;background:#e3efea;border-left:4px solid #21675e}#promptText{font-size:1.2rem;margin:.3rem 0}
 </style>
 <main>
-  <header><small>离线评听 / 01</small><h1>听音记录：整体音频质量</h1></header>
-  <section class="intro"><p><strong>只评价声音本身。</strong>听声音是否自然、清晰、连贯，有没有失真、断裂或不合理的重复。请勿按是否喜欢这类声音或能否猜出内容打分。相同质量可以同分。</p>
+  <header><small id="stage">离线评听 / 01</small><h1 id="title">听音记录：整体音频质量</h1></header>
+  <section class="intro"><p id="aim"><strong>只评价声音本身。</strong>听声音是否自然、清晰、连贯，有没有失真、断裂或不合理的重复。请勿按是否喜欢这类声音或能否猜出内容打分。相同质量可以同分。</p>
   <p>使用同一副耳机和安静的环境，先选舒适音量并保持不变。每条先从头到尾听一遍，再独立评分；可反复试听。每次只会播放一条。</p>
-  <small>1 很差：缺陷严重影响聆听；2 较差：明显且干扰；3 一般：有可闻缺陷但可接受；4 良好：仅轻微缺陷；5 优秀：自然、连贯，无明显缺陷。</small></section>
+  <small id="anchors">1 很差：缺陷严重影响聆听；2 较差：明显且干扰；3 一般：有可闻缺陷但可接受；4 良好：仅轻微缺陷；5 优秀：自然、连贯，无明显缺陷。</small></section>
+  <p id="companion" hidden>两项可独立参加。如两项都评，请先完成并导出音质评分，再打开 <a href="alignment.html">听音与文本匹配评测</a>；中途离开请先导出已评分进度。</p>
   <p id="error" class="warning" role="alert"></p><p id="notice" aria-live="polite"></p>
-  <form id="welcome"><label>匿名评听编号（勿用姓名或邮箱）
+  <form id="welcome" hidden><label>匿名评听编号（勿用姓名或邮箱）
   <input id="rater" required minlength="3" maxlength="32" autocomplete="off" spellcheck="false" placeholder="例如 K7P49"></label>
   <button class="primary">开始 / 继续本人评听</button>
   <p class="soft">使用 3–32 个英文字母、数字、下划线或短横线；恢复进度时请输入原编号。不同评听者请用不同编号。</p></form>
   <section id="app" hidden>
     <div class="bar"><h2 id="blockTitle"></h2><span id="count"></span></div>
-    <progress id="bar" aria-label="总评分进度"></progress><div id="clips"></div>
+    <progress id="bar" aria-label="总评分进度"></progress>
+    <section id="promptBox" hidden><strong>本组的文字描述</strong><p id="promptText" lang="en" dir="auto"></p></section><div id="clips"></div>
     <nav class="actions"><button id="prev">上一组</button><button id="next">下一组</button></nav>
     <footer><strong>休息与交卷</strong><p class="soft">可随时休息，同一浏览器通常会记住进度。换设备、移动文件夹或关闭隐私窗口前，请先导出进度。最终评分文件在所有音频完成后才能导出，请交给实验负责人。</p>
     <div class="actions"><button id="finish" class="primary">导出完整评分</button><button id="partial">导出已评分进度</button></div>
@@ -37,33 +40,54 @@ button,.file{font:inherit;border:1px solid #839d92;border-radius:6px;background:
 <script src="pack.js"></script>
 <script>
 'use strict';
-(() => {
+(async () => {
   const pack = globalThis.LISTENING_PACK;
   const get = id => document.getElementById(id);
   if (!pack || !pack.pack_id || !Array.isArray(pack.blocks) || !pack.blocks.length ||
       !pack.blocks.every(block => Array.isArray(block.clips) && block.clips.length === 4)) {
     get('error').textContent = '找不到完整题包。请解压整个文件夹，保留音频和 pack.js，再打开本页。'; return;
   }
-  const tags = ['失真 / 爆音','断裂 / 跳变','异常重复','噪声 / 模糊','不自然的音色'];
-  const qualityText = ['很差','较差','一般','良好','优秀'];
+  const alignment = location.pathname.endsWith('/alignment.html');
+  const dimension = alignment ? 'alignment' : 'quality';
+  const descriptor = alignment ? {dimension} : {};
+  let prompts;
+  if (alignment) {
+    document.title = '听音记录 · 文本匹配';
+    get('stage').textContent = '离线评听 / 02';
+    get('title').textContent = '听音记录：声音与文字的匹配程度';
+    get('aim').textContent = '先读本组文字描述，再听每条声音。评价实际听到的声源、事件、属性或先后顺序是否符合描述；仅按文字中明确提到的内容评分。即使音质一般，只要内容吻合也可以给高分。可单独参加本项；若两项都评，请先完成不显示文本的音质评测。';
+    get('anchors').textContent = '1 完全不符：听不到所描述的主体；2 少量吻合：只有个别线索相符；3 部分吻合：主体可辨但重要内容缺失或矛盾；4 大致吻合：主体与关键事件相符，少数细节欠缺；5 高度吻合：描述中的主体、事件和明确细节均能听到。';
+    try {
+      await new Promise((resolve,reject) => {
+        const script = document.createElement('script'); script.onload = resolve; script.onerror = reject;
+        script.src = 'prompts.js'; document.head.append(script);
+      });
+      const bundle = globalThis.LISTENING_PROMPTS;
+      if (!bundle || bundle.pack_id !== pack.pack_id || !pack.blocks.every(block =>
+          typeof bundle.prompts?.[block.id] === 'string' && bundle.prompts[block.id].trim())) throw Error();
+      prompts = bundle.prompts;
+    } catch { get('error').textContent = '本题包的文本描述缺失或不匹配。请解压完整文件夹，保留 prompts.js。'; return; }
+  } else if (globalThis.HAS_ALIGNMENT === true) { get('companion').hidden = false; }
+  const tags = alignment ? [] : ['失真 / 爆音','断裂 / 跳变','异常重复','噪声 / 模糊','不自然的音色'];
+  const scaleText = alignment ? ['完全不符','少量吻合','部分吻合','大致吻合','高度吻合'] : ['很差','较差','一般','良好','优秀'];
   let raterId = '';
-  const key = () => 'reca-listen-v1:' + pack.pack_id + ':' + raterId;
+  const key = () => (alignment ? 'reca-alignment-v1:' : 'reca-listen-v1:') + pack.pack_id + ':' + raterId;
   const make = (name, text, cls) => {
     const node = document.createElement(name); if (text !== undefined) node.textContent = text;
     if (cls) node.className = cls; return node;
   };
   const records = pack.blocks.map(block => ({id:block.id, clips:block.clips.map(clip =>
-    ({id:clip.id,quality:null,tags:[],heard:false}))}));
+    ({id:clip.id,[dimension]:null,tags:[],heard:false}))}));
   let page = 0;
-  const scored = row => row.heard && Number.isInteger(row.quality) && row.quality >= 1 && row.quality <= 5;
+  const scored = row => row.heard && Number.isInteger(row[dimension]) && row[dimension] >= 1 && row[dimension] <= 5;
   const total = records.reduce((sum, block) => sum + block.clips.length, 0);
   const count = () => records.reduce((sum, block) => sum + block.clips.filter(scored).length, 0);
   function persist() {
-    try { localStorage.setItem(key(), JSON.stringify({version:1,pack_id:pack.pack_id,rater_id:raterId,blocks:records,page})); }
+    try { localStorage.setItem(key(), JSON.stringify({version:1,...descriptor,pack_id:pack.pack_id,rater_id:raterId,blocks:records,page})); }
     catch { get('error').textContent = '浏览器未能保存本地进度。休息前请导出已评分进度。'; }
   }
   function restore(data, fromFile) {
-    if (data.version !== 1 || data.pack_id !== pack.pack_id || data.rater_id !== raterId || !Array.isArray(data.blocks)) throw Error();
+    if (data.version !== 1 || (data.dimension ?? 'quality') !== dimension || data.pack_id !== pack.pack_id || data.rater_id !== raterId || !Array.isArray(data.blocks)) throw Error();
     const seen = new Set(), edits = [];
     for (const block of data.blocks) {
       const target = records.find(item => item.id === block.id);
@@ -71,9 +95,9 @@ button,.file{font:inherit;border:1px solid #839d92;border-radius:6px;background:
       for (const item of block.clips) {
         const row = target.clips.find(clip => clip.id === item.id);
         if (!row || seen.has(row) || typeof item.heard !== 'boolean' ||
-            (!(item.quality === null && !fromFile) && !scored(item)) ||
+            (!(item[dimension] === null && !fromFile) && !scored(item)) ||
             !Array.isArray(item.tags) || !item.tags.every(tag => tags.includes(tag))) throw Error();
-        seen.add(row); edits.push([row,{heard:item.heard,quality:item.quality,tags:[...new Set(item.tags)]}]);
+        seen.add(row); edits.push([row,{heard:item.heard,[dimension]:item[dimension],tags:[...new Set(item.tags)]}]);
       }
     }
     for (const [row, values] of edits) Object.assign(row,values);
@@ -90,6 +114,7 @@ button,.file{font:inherit;border:1px solid #839d92;border-radius:6px;background:
   function render() {
     document.querySelectorAll('audio').forEach(audio => audio.pause());
     get('blockTitle').textContent = '第 ' + (page+1) + ' 组 / 共 ' + records.length + ' 组';
+    if (alignment) { get('promptBox').hidden = false; get('promptText').textContent = prompts[pack.blocks[page].id]; }
     get('clips').replaceChildren();
     pack.blocks[page].clips.forEach((clip,index) => {
       const row = records[page].clips[index], card = make('article');
@@ -98,11 +123,11 @@ button,.file{font:inherit;border:1px solid #839d92;border-radius:6px;background:
       audio.setAttribute('aria-label',title.textContent);
       const heard = make('span',undefined,'status soft');
       const rating = make('fieldset'), choices = make('div',undefined,'choices');
-      rating.append(make('legend','整体质量'),choices);
-      qualityText.forEach((text,idx) => {
+      rating.append(make('legend',alignment ? '听到的声音与这段文字有多吻合？' : '整体质量'),choices);
+      scaleText.forEach((text,idx) => {
         const label = make('label'), input = make('input');
-        input.type = 'radio'; input.name = 'score-' + index; input.checked = row.quality === idx+1;
-        input.onchange = () => { row.quality = idx+1; persist(); update(); };
+        input.type = 'radio'; input.name = 'score-' + index; input.checked = row[dimension] === idx+1;
+        input.onchange = () => { row[dimension] = idx+1; persist(); update(); };
         label.append(input,(idx+1)+' '+text); choices.append(label);
       });
       const notes = make('fieldset'), buttons = make('div',undefined,'tags');
@@ -130,7 +155,7 @@ button,.file{font:inherit;border:1px solid #839d92;border-radius:6px;background:
         ready(); if (!row.heard) heard.textContent='有未播放的部分，请从开头重新完整播放。';
       };
       audio.onerror = () => { heard.textContent='音频读取失败，请检查题包是否已完整解压。'; };
-      ready(); card.append(title,audio,heard,rating,notes); get('clips').append(card);
+      ready(); card.append(title,audio,heard,rating); if (!alignment) card.append(notes); get('clips').append(card);
     });
     update();
   }
@@ -139,9 +164,9 @@ button,.file{font:inherit;border:1px solid #839d92;border-radius:6px;background:
   function download(complete) {
     if (!count() || (complete && count()!==total)) return;
     const blocks = records.map(block => ({id:block.id,clips:block.clips.filter(scored)})).filter(block=>block.clips.length);
-    const file = new Blob([JSON.stringify({version:1,pack_id:pack.pack_id,rater_id:raterId,blocks},null,2)],{type:'application/json'});
+    const file = new Blob([JSON.stringify({version:1,...descriptor,pack_id:pack.pack_id,rater_id:raterId,blocks},null,2)],{type:'application/json'});
     const url = URL.createObjectURL(file), link = make('a');
-    link.href=url; link.download=(complete?'ratings-':'partial-') + pack.pack_id + '-' + raterId + '.json';
+    link.href=url; link.download=(complete?'ratings-':'partial-') + (alignment?'alignment-':'') + pack.pack_id + '-' + raterId + '.json';
     document.body.append(link); link.click(); link.remove(); setTimeout(()=>URL.revokeObjectURL(url),5000);
     get('notice').textContent=complete?'完整评分已导出，可以交卷。':'已导出当前已评分的片段。';
   }
@@ -164,6 +189,7 @@ button,.file{font:inherit;border:1px solid #839d92;border-radius:6px;background:
     get('notice').textContent='评听编号：' + raterId;
     get('welcome').hidden = true; get('app').hidden=false; render();
   };
+  get('welcome').hidden=false;
 })();
 </script>
 </html>
