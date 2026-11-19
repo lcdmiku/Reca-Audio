@@ -24,3 +24,5 @@
 第二段训练后，两种诊断 MSE 都比切换点低；终点与 Mix 的文本 MSE 相差仅约 0.000135。该诊断不代表 AudioCaps 生成 CLAP 或音质，也没有中点生成结果。
 
 生成评测入口：`bash runs/scripts/eval_audiocaps_scale.sh --reca-then-t2a`。独立输出 `runs/audits/audiocaps_reca_then_t2a_eval_v1/`，复用现有对照，只新增 445 条顺序组音频（五种设置 × 89）。主对比为同 LR 顺序组减交错 Mix，主要终点为 AudioCaps CFG=6 未参与早期探索的 81 个 SHA。完整性判据为评分完成标记 `COMPLETE` 和 `results.json`。
+
+[已完成评测：T2A、音频质量代理与重建对照](2026-11-19-sequential-results/analysis.md)
