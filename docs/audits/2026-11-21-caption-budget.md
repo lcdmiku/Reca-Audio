@@ -32,3 +32,18 @@ PYTHONPATH=src:Audio-Omni ~/miniconda3/envs/audio-omni/bin/python -m reca_audio.
 ```
 
 前序依据见[低 LR 评测](2026-11-18-low-lr-results/analysis.md)和[顺序与交错训练配对评测](2026-11-19-sequential-results/analysis.md)。
+
+## 实际终点与评测入口
+
+训练于北京时间 2026-11-21 16:06:24 完成，部署提交为 `28d590a`。终点文件共 12,162,314,250 字节，SHA256 为 `ee905bd85d4ec5dbe1078105bfba342d6917d62c442423d694d3c0a368972e6b`，训练端记录已通过重载。核对了全部 1,768 条计划更新记录，每条都保留原 Mix 的两个文本位置、四槽损失分母和相同 LR。3,536 次文本曝光覆盖 3,536 条独立训练音频。历史 Mix 的 ReCA 槽覆盖 3,535 条独立音频，与文本槽交集为 1 条。
+
+| 固定 8 样本诊断或训练统计 | Base | 低 LR Mix 终点 | 仅文本槽终点 |
+|---|---:|---:|---:|
+| T2A flow MSE | 0.934343 | 0.928669 | 0.930800 |
+| ReCA flow MSE | 0.946485 | 0.929032 | 0.940335 |
+| DiT 相对 Base 的 L2 漂移 | 0 | 0.9486% | 0.8991% |
+| 触发梯度裁剪的更新记录 | — | 352 / 1,768 | 99 / 1,768 |
+
+两组诊断 loss 的起点相同，终点均下降。Mix 在两种条件下的终点 MSE 更低，实际裁剪比例也更高。生成能力以配对生成结果判断。
+
+评测命令为 `bash runs/scripts/eval_audiocaps_scale.sh --mix-text-slots`，输出位于 `/home/linchudeng/Reca-Audio/runs/audits/audiocaps_mix_text_slots_eval_v1/`。只生成新组的五套 WAV，复用已校验摘要的低 LR 对照，评分时逐项检查 SHA、prompt、seed、长度和错配源。评测完成以 `COMPLETE` 和包含组间差值的 `results.json` 为准。

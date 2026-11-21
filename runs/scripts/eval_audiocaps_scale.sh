@@ -14,6 +14,12 @@ elif [[ "${1:-}" == --reca-then-t2a ]]; then
     entry=runs/scripts/eval_reca_then_t2a.py
     default_out=runs/audits/audiocaps_reca_then_t2a_eval_v1
     reserve_kib=$((2 * 1024 * 1024))
+elif [[ "${1:-}" == --mix-text-slots ]]; then
+    shift
+    entry=runs/scripts/eval_reca_then_t2a.py
+    eval_args+=(--mix-text-slots)
+    default_out=runs/audits/audiocaps_mix_text_slots_eval_v1
+    reserve_kib=$((2 * 1024 * 1024))
 fi
 out="${1:-$default_out}"
 python="${PYTHON_BIN:-$HOME/miniconda3/envs/audio-omni/bin/python}"
