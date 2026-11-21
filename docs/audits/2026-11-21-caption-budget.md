@@ -47,3 +47,5 @@ PYTHONPATH=src:Audio-Omni ~/miniconda3/envs/audio-omni/bin/python -m reca_audio.
 两组诊断 loss 的起点相同，终点均下降。Mix 在两种条件下的终点 MSE 更低，实际裁剪比例也更高。生成能力以配对生成结果判断。
 
 评测命令为 `bash runs/scripts/eval_audiocaps_scale.sh --mix-text-slots`，输出位于 `/home/linchudeng/Reca-Audio/runs/audits/audiocaps_mix_text_slots_eval_v1/`。只生成新组的五套 WAV，复用已校验摘要的低 LR 对照，评分时逐项检查 SHA、prompt、seed、长度和错配源。评测完成以 `COMPLETE` 和包含组间差值的 `results.json` 为准。
+
+评测于北京时间 2026-11-21 23:06 完成。[正式结果与分析](2026-11-22-caption-budget-results/analysis.md) · [完整指标表](2026-11-22-caption-budget-results/metrics.md)
