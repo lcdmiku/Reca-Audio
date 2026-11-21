@@ -32,7 +32,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--schedule-digest", default="")
     parser.add_argument(
         "--task-mode",
-        choices=["random_mix", "pure", "t2a", "balanced_mix", "reca_then_t2a"],
+        choices=["random_mix", "pure", "t2a", "balanced_mix", "reca_then_t2a", "mix_text_slots"],
         default="random_mix",
     )
     parser.add_argument("--prepare-only", action="store_true")
@@ -77,6 +77,8 @@ def validate_args(args: argparse.Namespace) -> None:
         args.prepare_only or args.arm != "b" or args.total_exposures % 8
     ):
         raise ValueError("reca_then_t2a requires an external two-phase schedule and complete arm-B updates")
+    if args.task_mode == "mix_text_slots" and (args.prepare_only or args.arm != "b"):
+        raise ValueError("mix_text_slots requires arm B and an existing balanced Mix schedule")
     if args.prepare_only:
         _helpers().validate_experiment_shape(args.total_exposures, accumulation=4)
         return
@@ -108,7 +110,7 @@ def experiment_contract(args: argparse.Namespace) -> dict[str, Any]:
         )
         accumulation = spec["accumulation"]
         updates = spec["optimizer_updates"]
-    return {
+    contract = {
         "arm": args.arm,
         "schedule": args.schedule,
         "task_mode": args.task_mode,
@@ -119,6 +121,29 @@ def experiment_contract(args: argparse.Namespace) -> dict[str, Any]:
         "optimizer_updates": updates,
         "equal_exposure_not_equal_updates": True,
     }
+    if args.task_mode == "mix_text_slots":
+        contract.pop("equal_exposure_not_equal_updates")
+        contract.update(
+            exposure_unit="historical_mix_schedule_slot",
+            scheduled_slots=args.total_exposures,
+            active_training_exposures=args.total_exposures // 2,
+            active_task_counts={"reca": 0, "t2a": args.total_exposures // 2},
+            active_microbatches_per_update=2,
+            loss_divisor=4,
+            inactive_slot_action="replay_frozen_prepare_only",
+        )
+    return contract
+
+
+def validate_mix_text_slots(schedule: list[dict]) -> None:
+    if not schedule or len(schedule) % 4:
+        raise ValueError("balanced Mix schedule requires complete four-slot groups")
+    for start in range(0, len(schedule), 4):
+        group = schedule[start:start + 4]
+        if [row["exposure"] for row in group] != list(range(start + 1, start + 5)):
+            raise ValueError(f"nonconsecutive Mix schedule positions at slot {start + 1}")
+        if sorted(row["task"] for row in group) != ["reca", "reca", "t2a", "t2a"]:
+            raise ValueError(f"expected two ReCA and two T2A slots at slot {start + 1}")
 
 
 def adafactor_kwargs(lr: float, weight_decay: float) -> dict[str, Any]:
@@ -190,6 +215,9 @@ def _run(args: argparse.Namespace) -> int:
     schedule = helpers.load_schedule(args.schedule, expected_digest=digest)
     if len(schedule) != args.total_exposures:
         raise ValueError("schedule length does not match total exposures")
+    text_slots = args.task_mode == "mix_text_slots"
+    if text_slots:
+        validate_mix_text_slots(schedule)
     if args.task_mode == "reca_then_t2a" and any(
         row["exposure"] != index + 1 or row["task"] != ("reca" if index < len(schedule) // 2 else "t2a")
         for index, row in enumerate(schedule)
@@ -344,6 +372,7 @@ def _run(args: argparse.Namespace) -> int:
         diagnostic_exposures = _positions(args.diagnostic_exposures)
         save_exposures = _positions(args.save_exposures)
         update_index = 0
+        active_training_exposures = 0
         started = time.time()
         for start_index in range(0, args.total_exposures, accumulation):
             optimizer.zero_grad(set_to_none=True)
@@ -353,6 +382,11 @@ def _run(args: argparse.Namespace) -> int:
                 latents, cond_inputs = prepare(
                     train_dataset, record["sample_index"], record["task"], record
                 )
+                if text_slots and record["task"] == "reca":
+                    # The frozen VAE draws from the global CPU RNG. Retain its
+                    # original slot so later text targets match the Mix run.
+                    del latents, cond_inputs
+                    continue
                 closure = loss_closure(latents, cond_inputs, record["flow_seed"])
                 loss = closure()
                 scaler.scale(loss / accumulation).backward()
@@ -402,6 +436,16 @@ def _run(args: argparse.Namespace) -> int:
                 "block_gradient_norms": block_norms,
                 "elapsed_seconds": time.time() - started,
             }
+            if text_slots:
+                active_slots = [row["exposure"] for row in group if row["task"] == "t2a"]
+                active_training_exposures += len(active_slots)
+                record.update(
+                    scheduled_slots=exposure,
+                    active_slot_positions=active_slots,
+                    active_training_exposures=active_training_exposures,
+                    active_task_counts={"reca": 0, "t2a": active_training_exposures},
+                    loss_divisor=accumulation,
+                )
             _write_jsonl(metrics, record)
             print(
                 f"[step] arm={args.arm} update={update_index} exposure={exposure} "
