@@ -58,6 +58,29 @@ def resolve_omni_dtype(requested: str = "auto") -> torch.dtype:
     return torch.float32
 
 
+def _reca_audio_spans(input_ids, valid, hidden_shape, audio_id, widths, pad_length):
+    """Map audio payload runs to the packed (unpadded) sequence coordinates."""
+    if input_ids is None or valid is None or input_ids.shape != hidden_shape or valid.shape != hidden_shape:
+        raise ValueError("ReCA pooling requires aligned Qwen input IDs, attention mask and hidden states")
+    spans = []
+    for b, width in enumerate(widths):
+        if width == 1:
+            continue
+        keep = valid[b].bool()
+        packed = F.pad(keep.long().cumsum(0), (1, 0))
+        if packed[-1].item() > pad_length:
+            raise ValueError("ReCA pooling cannot identify individual tokens after sequence interpolation")
+        audio = (input_ids[b] == audio_id) & keep
+        boundaries = F.pad(audio.long(), (1, 1)).diff().nonzero().flatten()
+        if boundaries.numel() == 0:
+            raise ValueError("ReCA pooling found no valid audio payload tokens")
+        # Compute runs before compacting so neither a masked gap nor a special
+        # token can cause two distinct audio spans to share a pooling window.
+        bounds = packed[boundaries].tolist()
+        spans.extend((b, start, end, width) for start, end in zip(bounds[::2], bounds[1::2]))
+    return spans
+
+
 class OmniConditioner(Conditioner):
     QWEN_VL_MODELS = ["Qwen/Qwen2.5-Omni-7B", "Qwen/Qwen2.5-Omni-3B"]
     def __init__(self,
@@ -162,6 +185,7 @@ class OmniConditioner(Conditioner):
     def forward(self, prompt_list: tp.List[torch.Tensor], device: tp.Union[torch.device, str]) -> tp.Tuple[torch.Tensor, torch.Tensor]:
         pad_length = self.pad_length
         batch_size = len(prompt_list)
+        pool_spans = []
         if isinstance(prompt_list[0], dict):
 
             text_prompts =  [item.get("text_prompt") for item in prompt_list]
@@ -196,16 +220,32 @@ class OmniConditioner(Conditioner):
                 arr = np.asarray(arr)
                 return arr.size > 0 and float(np.max(np.abs(arr))) > 1e-8
 
+            widths = [item.get("reca_audio_pool_width", 1) for item in prompt_list]
+            if any(width not in (1, 4) for width in widths):
+                raise ValueError("reca_audio_pool_width must be 1 or 4")
+            if any(width == 4 and not _has_signal(p) for width, p in zip(widths, audio_prompts)):
+                raise ValueError("ReCA pooling requires a waveform accepted by the Qwen processor")
             audio_prompts = [p for p in audio_prompts if _has_signal(p)] or None
             
             inputs = self.processor(text=text_prompts, audio=audio_prompts, images=None, videos=video_prompts,  return_tensors="pt", padding=True, use_audio_in_video=False)
             qwen_mask = inputs.get("attention_mask", None)
+            token_ids = inputs.get("input_ids")
             inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
 
             with torch.no_grad():
                 with torch.amp.autocast("cuda", enabled=False):  # Disable mixed precision, use float32
                     qwen_omni_output = self.model.thinker(**inputs,output_hidden_states=True,return_dict=True)
                     omni_features = qwen_omni_output.hidden_states[self.layer_idx].to(self._omni_dtype) # omni_features: [B, seq_len, hidden_dim]
+
+            if 4 in widths:
+                if getattr(self, "zip_features", False):
+                    raise ValueError("ReCA pooling requires individually addressable, unzipped tokens")
+                tokenizer = self.processor.tokenizer
+                audio_id = tokenizer.convert_tokens_to_ids("<|AUDIO|>")
+                if audio_id is None or tokenizer.convert_ids_to_tokens(audio_id) != "<|AUDIO|>":
+                    raise ValueError("Qwen tokenizer is missing the <|AUDIO|> payload token")
+                pool_spans = _reca_audio_spans(token_ids, qwen_mask, omni_features.shape[:2],
+                                              audio_id, widths, pad_length)
 
             if qwen_mask is not None:
                 qwen_mask = qwen_mask.to(device)
@@ -319,6 +359,14 @@ class OmniConditioner(Conditioner):
 
         omni_features = self.norm(omni_features)
         omni_features = self.proj_features(omni_features.to(self.proj_features.weight.dtype))
+        if pool_spans:
+            pooled = omni_features.clone()
+            for b, start, end, width in pool_spans:
+                span = omni_features[b, start:end].transpose(0, 1).unsqueeze(0)
+                means = F.avg_pool1d(span.float(), width, stride=width, ceil_mode=True, count_include_pad=False)
+                repeated = means.squeeze(0).transpose(0, 1).repeat_interleave(width, dim=0)
+                pooled[b, start:end] = repeated[:end - start].to(pooled.dtype)
+            omni_features = pooled
 
         if hasattr(self, "zip_features") and self.zip_features:
             omni_features = self.proj_omni_seq_len(omni_features.transpose(1, 2)).transpose(1, 2)

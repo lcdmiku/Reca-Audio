@@ -61,6 +61,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--amp", action="store_true")
     parser.add_argument("--omni-downsample", type=int, default=4)
     parser.add_argument("--omni-seconds", type=float, default=0.0)
+    parser.add_argument("--reca-audio-pool-width", type=int, choices=(1, 4), default=1,
+                        help="Mean-pool projected ReCA audio tokens in place; 1 uses the original features.")
     return parser.parse_args(argv)
 
 
@@ -132,6 +134,8 @@ def experiment_contract(args: argparse.Namespace) -> dict[str, Any]:
             loss_divisor=4,
             inactive_slot_action="replay_frozen_prepare_only",
         )
+    if args.reca_audio_pool_width > 1:
+        contract["reca_audio_pool_width"] = args.reca_audio_pool_width
     return contract
 
 
@@ -216,7 +220,7 @@ def _run(args: argparse.Namespace) -> int:
     if len(schedule) != args.total_exposures:
         raise ValueError("schedule length does not match total exposures")
     text_slots = args.task_mode == "mix_text_slots"
-    if text_slots:
+    if text_slots or (args.task_mode == "balanced_mix" and args.reca_audio_pool_width > 1):
         validate_mix_text_slots(schedule)
     if args.task_mode == "reca_then_t2a" and any(
         row["exposure"] != index + 1 or row["task"] != ("reca" if index < len(schedule) // 2 else "t2a")
@@ -280,6 +284,8 @@ def _run(args: argparse.Namespace) -> int:
                     prompt_rng=random.Random(seeds["prompt_seed"]),
                 )
             ]
+            if mode == "reca" and args.reca_audio_pool_width > 1:
+                metadata[0]["omni_prompt"]["reca_audio_pool_width"] = args.reca_audio_pool_width
             cond_tensors = model.conditioner(metadata, cond_device)
             cond_inputs = model.get_conditioning_inputs(move_cond(cond_tensors, device))
         return latents, cond_inputs

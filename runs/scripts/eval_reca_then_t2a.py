@@ -26,12 +26,21 @@ SEQUENTIAL = Endpoint(Path("runs/train/audiocaps_reca_then_t2a_v1"), "sequential
                       "dbc75946263411da77466edc9b31b1c3d945df864265588036d5d83344285e94")
 TEXT_SLOTS = Endpoint(Path("runs/train/audiocaps_mix_text_slots_v1"), "text_slots_7070",
                       "bd5ca9ffa653c06af7d0c1eefb1e36e2fbf6ed09f8bf1b496afb9da1107126a0")
+POOL4 = Endpoint(Path("runs/train/audiocaps_mix_pool4_v1"), "mix_pool4_7070", TEXT_SLOTS.schedule_sha)
 
 
-def prior_results():
-    path = PRIOR / "results.json"
-    if not (PRIOR / "COMPLETE").is_file() or audit.sha(path) != PRIOR_SHA:
-        raise ValueError("Invalid historical low-LR reference")
+def reference(endpoint):
+    if endpoint == POOL4:
+        return ("caption_budget_reference", Path("runs/audits/audiocaps_mix_text_slots_eval_v1"),
+                "d33acc98ac6a7efd7716fbee0fa9247db48c5d6b0389576b2b7395f78862085c")
+    return "low_lr_reference", PRIOR, PRIOR_SHA
+
+
+def prior_results(endpoint=SEQUENTIAL):
+    _, directory, digest = reference(endpoint)
+    path = directory / "results.json"
+    if not (directory / "COMPLETE").is_file() or audit.sha(path) != digest:
+        raise ValueError(f"Invalid historical reference: {directory}")
     return json.loads(path.read_text())
 
 
@@ -72,7 +81,8 @@ def prepare(root, endpoint=SEQUENTIAL):
     train, arm, schedule_sha = endpoint
     if root.exists() or not (train / "COMPLETE").is_file():
         raise ValueError("Require completed training and a new evaluation directory")
-    protocol = prior_results()["protocol"]
+    reference_key, prior_dir, prior_digest = reference(endpoint)
+    protocol = prior_results(endpoint)["protocol"]
     if (protocol["steps"] != 100 or protocol["smoke"] or protocol["dtype"] != "float16"
             or protocol["settings"] != {key: list(audit.SETTINGS[key]) for key in SETTINGS}):
         raise ValueError("Low-LR generation settings mismatch")
@@ -86,6 +96,20 @@ def prepare(root, endpoint=SEQUENTIAL):
     rows = audit.audio_io.read_jsonl(train / arm / "metrics.jsonl")
     if endpoint == TEXT_SLOTS:
         coverage = text_slot_coverage(protocol, contract, schedule, rows)
+    elif endpoint == POOL4:
+        coverage = protocol["coverage"]["mix_7070"].copy()
+        if (contract != dict(mix["contract"], schedule=str(schedule), reca_audio_pool_width=4)
+                or coverage["schedule_sha256"] != schedule_sha or mix["schedule_sha256"] != schedule_sha):
+            raise ValueError("Pooled Mix differs from the expected historical training contract")
+        steps = [row for row in rows if row["kind"] == "optimizer_step"]
+        historical = audit.audio_io.read_jsonl(Path(mix["path"]).with_name("metrics.jsonl"))
+        ref_steps = [row for row in historical if row["kind"] == "optimizer_step"]
+        if len(steps) != 1768 or len(ref_steps) != len(steps):
+            raise ValueError("Incomplete pooled or historical Mix trajectory")
+        for i, (step, ref) in enumerate(zip(steps, ref_steps), start=1):
+            if (step["optimizer_step"] != i or step["exposure"] != 4 * i or step["lr"] != ref["lr"]
+                    or not all(np.isfinite(step[k]) for k in ("t2a_loss", "reca_loss"))):
+                raise ValueError(f"Pooled Mix exposure, LR or task loss mismatch at update {i}")
     else:
         coverage = json.loads((train / "schedule.jsonl.audit.json").read_text())
         if (coverage["schedule_sha256"] != schedule_sha or coverage["source_sha256"] != mix["schedule_sha256"]
@@ -101,8 +125,8 @@ def prepare(root, endpoint=SEQUENTIAL):
     protocol["training_trajectory"][arm] = dict(diagnostics=[
         {key: row[key] for key in ("exposure", "reca_loss", "t2a_loss", "paired_gradient_cosine")}
         for row in rows if row["kind"] == "diagnostic"])
-    protocol["low_lr_reference"] = dict(results=str(PRIOR / "results.json"), sha256=PRIOR_SHA,
-                                        git_commit=protocol["git_commit"], training_deployment=protocol["training_deployment"])
+    protocol[reference_key] = dict(results=str(prior_dir / "results.json"), sha256=prior_digest,
+                                   git_commit=protocol["git_commit"], training_deployment=protocol["training_deployment"])
     protocol["training_deployment"] = (train / "DEPLOYED_COMMIT").read_text().strip()
     protocol["deployed_commit"] = Path("DEPLOYED_COMMIT").read_text().strip()
     protocol["git_commit"] = dict(line.split("=", 1) for line in protocol["deployed_commit"].splitlines())["commit"]
@@ -110,8 +134,8 @@ def prepare(root, endpoint=SEQUENTIAL):
     for setting in SETTINGS:
         folder = root / setting
         folder.mkdir()
-        (folder / "base").symlink_to((PRIOR / setting / "base").resolve(strict=True), target_is_directory=True)
-    (root / "reca_ref").symlink_to((PRIOR / "reca_ref").resolve(strict=True), target_is_directory=True)
+        (folder / "base").symlink_to((prior_dir / setting / "base").resolve(strict=True), target_is_directory=True)
+    (root / "reca_ref").symlink_to((prior_dir / "reca_ref").resolve(strict=True), target_is_directory=True)
     audit.write_json(root / "protocol.json", protocol)
     print(f"Prepared {arm}: {protocol['checkpoints'][arm]['sha256']}", flush=True)
 
@@ -119,6 +143,10 @@ def prepare(root, endpoint=SEQUENTIAL):
 def add_controls(payload, prior, endpoint=SEQUENTIAL):
     reference_first = endpoint == TEXT_SLOTS
     label = "reference_minus_text_slots" if reference_first else "sequential_minus_control"
+    controls = CONTROLS
+    if endpoint == POOL4:
+        label = "pool4_minus_control"
+        controls = (*CONTROLS, TEXT_SLOTS.arm)
     def compare(new, reference, records):
         return audit.paired(reference, new, records) if reference_first else audit.paired(new, reference, records)
 
@@ -132,8 +160,11 @@ def add_controls(payload, prior, endpoint=SEQUENTIAL):
         records = [rows[idx] for idx in main]
         if len(rows) != 89 or len(main) != (89 if setting == "music_10_cfg6" else 81):
             raise ValueError(f"Invalid number of paired items: {setting}")
+        if endpoint == POOL4 and any(row.get("reca_audio_pool_width", 1) != (4 if setting.startswith("reca_") else 1)
+                                     for row in rows):
+            raise ValueError(f"Incorrect recorded conditioning intervention: {setting}")
         values = np.array([row["clap"] for row in records])
-        for arm in CONTROLS:
+        for arm in controls:
             ref = prior["generation"][setting][arm]
             if identities(ref["rows"]) != identities(rows):
                 raise ValueError(f"Invalid paired identities: {arm}/{setting}")
@@ -146,7 +177,7 @@ def add_controls(payload, prior, endpoint=SEQUENTIAL):
             ref_values = np.array([ref["rows"][idx]["clap"] for idx in main])
             contrasts.setdefault(label, {}).setdefault(setting, {})[arm] = compare(values, ref_values, records)
     gap = "reca_matched_minus_mismatched"
-    for arm in CONTROLS:
+    for arm in controls:
         contrasts[gap][arm] = prior["paired_contrasts"][gap][arm]
     matched = payload["generation"]["reca_matched"]
     mismatched = payload["generation"]["reca_mismatched"]
@@ -156,7 +187,7 @@ def add_controls(payload, prior, endpoint=SEQUENTIAL):
         return np.array([matched[arm]["rows"][idx]["clap"] - mismatched[arm]["rows"][idx]["clap"]
                          for idx in primary])
     contrasts[f"{label}_matching_advantage"] = {
-        arm: compare(advantages(endpoint.arm), advantages(arm), records) for arm in CONTROLS}
+        arm: compare(advantages(endpoint.arm), advantages(arm), records) for arm in controls}
 
 
 if __name__ == "__main__":
@@ -165,16 +196,21 @@ if __name__ == "__main__":
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--shard", type=int, default=0)
     parser.add_argument("--shards", type=int, default=1)
-    parser.add_argument("--mix-text-slots", action="store_true")
+    alternative = parser.add_mutually_exclusive_group()
+    alternative.add_argument("--mix-text-slots", action="store_true")
+    alternative.add_argument("--mix-pool4", action="store_true")
     args = parser.parse_args()
     endpoint = TEXT_SLOTS if args.mix_text_slots else SEQUENTIAL
+    if args.mix_pool4:
+        endpoint = POOL4
     audit.ARMS = ("base", endpoint.arm)
     audit.SETTINGS = {key: audit.SETTINGS[key] for key in SETTINGS}
     if args.phase == "prepare":
         prepare(args.out, endpoint)
     else:
         protocol = audit.load_protocol(args.out)
-        if ((args.out / "COMPLETE").exists() or protocol.get("low_lr_reference", {}).get("sha256") != PRIOR_SHA
+        reference_key, _, prior_digest = reference(endpoint)
+        if ((args.out / "COMPLETE").exists() or protocol.get(reference_key, {}).get("sha256") != prior_digest
                 or protocol.get("checkpoints", {}).get(endpoint.arm, {}).get("schedule_sha256") != endpoint.schedule_sha):
             raise ValueError("Refusing to modify an unrelated or completed evaluation")
         if args.phase == "generate":
@@ -182,7 +218,7 @@ if __name__ == "__main__":
                 parser.error("invalid shard")
             audit.generate(args.out, args.shard, args.shards, skip_base=True)
         else:
-            previous = prior_results()
+            previous = prior_results(endpoint)
             audit.score(args.out)
             path = args.out / "results.json"
             results = json.loads(path.read_text())

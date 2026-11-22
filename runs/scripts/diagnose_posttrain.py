@@ -134,6 +134,8 @@ def set_arm(dit, protocol, arm):
         raise ValueError(f"incorrect checkpoint exposure or update count: {arm}")
     if "schedule_sha256" in meta and checkpoint["schedule_digest"] != meta["schedule_sha256"]:
         raise ValueError(f"checkpoint schedule mismatch: {arm}")
+    if "reca_audio_pool_width" in meta.get("contract", {}) and checkpoint.get("contract") != meta["contract"]:
+        raise ValueError(f"checkpoint pooling contract mismatch: {arm}")
     dit.load_state_dict(checkpoint["dit"], strict=True)
 
 
@@ -142,10 +144,12 @@ def clip_for(dataset, row):
     return dataset[row["row"]]
 
 
-def condition(api, kind, item, clip=None):
+def condition(api, kind, item, clip=None, *, reca_audio_pool_width=1):
     if kind == "reca":
         metadata = [build_reca_metadata(clip, "cuda:1", omni_downsample=4,
                                         prompt_rng=random.Random(42))]
+        if reca_audio_pool_width != 1:
+            metadata[0]["omni_prompt"]["reca_audio_pool_width"] = reca_audio_pool_width
     else:
         task = "T2M" if kind == "music" else "T2A"
         prompt = item["prompt"]
@@ -174,12 +178,13 @@ def generate(root, shard, shards, *, skip_base=False):
             continue
         set_arm(api.model.model, protocol, arm)
         for setting, (domain, size, cfg) in SETTINGS.items():
+            width = protocol["checkpoints"][arm].get("contract", {}).get("reca_audio_pool_width", 1) if domain == "reca" else 1
             items = protocol["music" if domain == "music" else "audio"]
             for index in range(shard, len(items), shards):
                 item = items[index]
                 source_index = (index + 1) % len(items) if setting == "reca_mismatched" else index
                 source = items[source_index]
-                key = (domain, source_index)
+                key = (domain, source_index, width)
                 folder = root / setting / arm
                 folder.mkdir(parents=True, exist_ok=True)
                 wav, record = folder / f"{index:03d}.wav", folder / f"{index:03d}.json"
@@ -189,7 +194,7 @@ def generate(root, shard, shards, *, skip_base=False):
                     continue
                 if key not in cached:
                     clip = clip_for(dataset, source) if domain == "reca" else None
-                    cached[key] = condition(api, domain, source, clip)
+                    cached[key] = condition(api, domain, source, clip, reca_audio_pool_width=width)
                 if domain == "reca" and setting == "reca_matched" and arm == "base":
                     ref = root / "reca_ref" / f"{index:03d}.wav"
                     ref.parent.mkdir(exist_ok=True)
@@ -203,7 +208,10 @@ def generate(root, shard, shards, *, skip_base=False):
                 if output.shape[-1] != frames or not torch.isfinite(output).all() or not output.any():
                     raise ValueError(f"invalid output: {wav}, shape={output.shape}")
                 audio_io.save_audio(wav, api._postprocess(output), 44100)
-                write_json(record, dict(**item, seed=seed, frames=frames, source_sha=source["sha"], wav=str(wav)))
+                metadata = dict(**item, seed=seed, frames=frames, source_sha=source["sha"], wav=str(wav))
+                if width != 1:
+                    metadata["reca_audio_pool_width"] = width
+                write_json(record, metadata)
             print(f"complete shard={shard} arm={arm} setting={setting}", flush=True)
 
 

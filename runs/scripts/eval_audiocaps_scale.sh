@@ -20,6 +20,12 @@ elif [[ "${1:-}" == --mix-text-slots ]]; then
     eval_args+=(--mix-text-slots)
     default_out=runs/audits/audiocaps_mix_text_slots_eval_v1
     reserve_kib=$((2 * 1024 * 1024))
+elif [[ "${1:-}" == --mix-pool4 ]]; then
+    shift
+    entry=runs/scripts/eval_reca_then_t2a.py
+    eval_args+=(--mix-pool4)
+    default_out=runs/audits/audiocaps_mix_pool4_eval_v1
+    reserve_kib=$((2 * 1024 * 1024))
 fi
 out="${1:-$default_out}"
 python="${PYTHON_BIN:-$HOME/miniconda3/envs/audio-omni/bin/python}"
