@@ -30,3 +30,5 @@
 
 - 训练命令为 `bash runs/scripts/train_audiocaps_mix_pool4.sh`。目录为 `/home/linchudeng/Reca-Audio/runs/train/audiocaps_mix_pool4_v1/`。终点路径为 `mix_pool4_7070/dit_exposure7072.pt`，逐步记录为 `mix_pool4_7070/metrics.jsonl`。
 - 评测命令为 `bash runs/scripts/eval_audiocaps_scale.sh --mix-pool4`。沿用相同 prompt、seed、10 秒请求、100 步和 fp16，只为新模型生成 445 条音频。输出目录为 `/home/linchudeng/Reca-Audio/runs/audits/audiocaps_mix_pool4_eval_v1/`。
+
+11 月 25 日重跑和评分已完成。[配对结果与解释](2026-11-25-mix-pool4-results/analysis.md) · [全部指标](2026-11-25-mix-pool4-results/metrics.md)
