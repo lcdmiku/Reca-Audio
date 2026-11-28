@@ -147,7 +147,13 @@ def run(out, smoke):
                     qwen_snapshot=os.environ.get("QWEN_OMNI_MODEL_PATH"),
                     manifest_sha=None if smoke else digest(manifest),
                     deployment=Path("DEPLOYED_COMMIT").read_text().strip())
-    write(out / "inference_protocol.json", protocol)
+    protocol_file = out / "inference_protocol.json"
+    if protocol_file.is_file():
+        previous = json.loads(protocol_file.read_text(encoding="utf-8"))
+        if previous != protocol:
+            raise ValueError("The existing evaluation used a different protocol")
+    else:
+        write(protocol_file, protocol)
     api = FloatEdit(str(CONFIG), checkpoint_specs["base"]["path"], device="cuda:0",
                     conditioner_device="cuda:1", dtype="float16")
     assert api.sample_size == protocol["requested_frames"] and api.sample_rate == protocol["sample_rate"]

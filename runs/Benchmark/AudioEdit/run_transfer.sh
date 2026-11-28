@@ -32,9 +32,17 @@ if [[ "${1:-}" == smoke ]]; then
     exit
 fi
 
+if [[ "${1:-}" == smoke-score ]]; then
+    test -s "$smoke/GENERATION_COMPLETE"
+    "$python" -u runs/Benchmark/AudioEdit/score_transfer.py --out "$smoke" --device cuda:0 --smoke >"$smoke/score.log" 2>&1
+    test -s "$smoke/smoke_scores.json"
+    exit
+fi
+
 test "${1:-}" = formal
 test -s "$smoke/GENERATION_COMPLETE"
 test -s "$smoke/condition_checks.json"
+test -s "$smoke/smoke_scores.json"
 test ! -e "$root/formal"
 reserve=$((4 * 1024 * 1024))
 kib="$(du -sk "$HOME" | cut -f1)"
@@ -45,4 +53,6 @@ test "$free" -gt "$reserve"
 "$python" -u runs/Benchmark/AudioEdit/evaluate_transfer.py --out "$root/formal" >"$root/formal/generation.log" 2>&1
 test -s "$root/formal/GENERATION_COMPLETE"
 "$python" -u runs/Benchmark/AudioEdit/score_transfer.py --out "$root/formal" --device cuda:0 >"$root/formal/score.log" 2>&1
+test -s "$root/formal/results.json"
+"$python" runs/Benchmark/AudioEdit/listening_packet.py build --formal "$root/formal" --out "$root/listening"
 date -Is >"$root/formal/COMPLETE"
