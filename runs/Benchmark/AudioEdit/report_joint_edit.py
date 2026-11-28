@@ -1,8 +1,42 @@
 """Render the paired A0/A1 evaluation in the experiment output directory."""
 import json
 
+from score_transfer import log_mel_distance, paired, read_audio, waveform_part
+
 
 NAMES = {"a0": "A0 原生 Edit", "a1": "A1 低通音频与文本"}
+
+
+def add_source_copy_check(root, result):
+    """Measure whether the edited region is spectrally closer to the source."""
+    rows = [json.loads(line) for line in (root / "manifest.jsonl").read_text().splitlines()]
+    native = {row["id"]: row for row in rows if row["kind"] in ("add", "remove")}
+    sources = {
+        name: waveform_part(read_audio(row["source"])[0], row["span"], "event")
+        for name, row in native.items()
+    }
+    controls = {arm: [] for arm in NAMES}
+    for arm, samples in result["detail"].items():
+        for sample in samples:
+            name = sample["id"]
+            if name not in native:
+                continue
+            wave = read_audio(root / "audio" / arm / f"{name}.wav", generated=True)[0]
+            edit_region = waveform_part(wave, native[name]["span"], "event")
+            distance = log_mel_distance(edit_region, sources[name])
+            margin = sample["edit_region_logmel"] - distance
+            missed_edit = sample["edit_success"] == 0
+            closer_on_miss = (float(margin > 0 and missed_edit)
+                              if sample["edit_success"] is not None else None)
+            controls[arm].append(dict(id=name, group=sample["group"], kind=sample["kind"],
+                                      source_preference=margin, source_preference_on_edit_miss=closer_on_miss))
+    result["source_copy_check"] = {
+        "rows": controls,
+        "a1_minus_a0": {
+            key: paired(controls["a1"], controls["a0"], key, by_task=True)
+            for key in ("source_preference", "source_preference_on_edit_miss")
+        },
+    }
 
 
 def render_report(root, result):
@@ -62,6 +96,18 @@ def render_report(root, result):
             change = stats["delta"] * scale
             rows.append(f"| {name} {title} | {stats['n']}／{stats['groups']} | {change:+.5f} | "
                         f"[{lo:+.5f}, {hi:+.5f}] |")
+    controls = result.get("source_copy_check")
+    if controls:
+        for key, label, scale in (
+            ("source_preference", "编辑区源偏好（目标距离减源距离）", 1),
+            ("source_preference_on_edit_miss", "编辑未达标且更接近源（百分点）", 100),
+        ):
+            item = controls["a1_minus_a0"][key]
+            lo, hi = [value * scale for value in item["ci95"]]
+            rows.append(f"| {label} | {item['n']}／{item['groups']} | {item['delta'] * scale:+.5f} | "
+                        f"[{lo:+.5f}, {hi:+.5f}] |")
+        rows += ["", "编辑区源偏好使用同一时段的 Log-Mel 距离。正差代表 A1 更偏向原输入；"
+                 "该频谱指标用于识别复制倾向。"]
     joint = delta["native"]["joint_success"]
     edit = delta["native"]["edit_success"]
     if joint and edit and joint["ci95"][0] > 0 and edit["ci95"][1] >= 0:

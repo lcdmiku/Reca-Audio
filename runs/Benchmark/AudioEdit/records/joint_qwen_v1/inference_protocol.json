@@ -1,0 +1,23 @@
+{
+  "config_sha": "7ff9f60a6df943f03d86f6a8979910ef58524c192d1daba159ad17df2ffa1d62",
+  "sample_rate": 44100,
+  "input_frames": 441000,
+  "requested_frames": 485100,
+  "expected_frames": 483328,
+  "steps": 100,
+  "cfg": 7,
+  "dtype": "float16",
+  "manifest_sha": "5e1760d86105bbf31f2934beace88ea045199f9c1445c7c7686c47928882672a",
+  "qwen_snapshot": "/home/linchudeng/.cache/huggingface/hub/models--Qwen--Qwen2.5-Omni-3B/snapshots/f75b40e3da2003cdd6e1829b1f420ca70797c34e",
+  "checkpoint": {
+    "path": "Audio-Omni/model/model.ckpt",
+    "sha256": "8ddfdd6c965b7b1fc5c5af01e306cdfd78e44f56fd584789b8987233438e65b3",
+    "bytes": 22220882720
+  },
+  "qwen_downsample": {
+    "a0": null,
+    "a1": 4
+  },
+  "gpu_visibility": "1,2",
+  "deployment": "commit=207006f\ndeployed_at=2026-11-28T11:29:51+00:00\nmanifest=b82f26dc93c417c4ddbed7d2fdca6f83ae5ce5b09dfac28cbac7dfdd5afd31be\nfiles=141"
+}

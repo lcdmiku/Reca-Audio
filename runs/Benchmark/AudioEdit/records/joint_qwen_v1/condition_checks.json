@@ -1,0 +1,149 @@
+{
+  "rows": [
+    {
+      "id": "edit_01_add",
+      "kind": "add",
+      "a0": {
+        "id": "edit_01_add",
+        "seed": 37022,
+        "frames": 483328,
+        "wav_sha256": "91b695b78bbe44fe0747f2a2e71660a8d268fb2f4fe5ec26ee1769ccb7ecff46",
+        "mel_source_sha": "e59369f5c968c400fad2d62ace139542ebb2ab9d020261cbb21cf00ba6ba463c",
+        "mel_source_frames": 441000,
+        "mel_projection_sha": "829c5389c3b416155ca8f4da2262a755aa1b0913ec883d2e52966a880eb8c1ef",
+        "qwen_projection_sha": "0558f723a81b6f70138accbaa0d2f04981afcf88534a76bb84650102d076b133",
+        "audio_tokens": 0,
+        "audio_feature_frames": 0,
+        "instruction_present": true,
+        "same_thinker_call": false
+      },
+      "a1": {
+        "id": "edit_01_add",
+        "seed": 37022,
+        "frames": 483328,
+        "wav_sha256": "81a370094e6e0bb414dd9ed8d91012b949cb65f8eeef2f6becb635d52e6ca68b",
+        "mel_source_sha": "e59369f5c968c400fad2d62ace139542ebb2ab9d020261cbb21cf00ba6ba463c",
+        "mel_source_frames": 441000,
+        "qwen_audio_sha": "081a45b02a3a63c0ab74a3dc9323d3c3cac99592518bc7ed8da48bc9007975f4",
+        "qwen_waveform_samples": 160000,
+        "mel_projection_sha": "829c5389c3b416155ca8f4da2262a755aa1b0913ec883d2e52966a880eb8c1ef",
+        "qwen_projection_sha": "2c9ec8c7d97fa6a0cc6cd1e68f3fc22539dffccea6fdab285701c7c611094910",
+        "audio_tokens": 250,
+        "audio_feature_frames": 1000,
+        "instruction_present": true,
+        "same_thinker_call": true
+      },
+      "a0_waveform_matches_archive": true,
+      "a0_file_matches_archive": false
+    },
+    {
+      "id": "edit_01_remove",
+      "kind": "remove",
+      "a0": {
+        "id": "edit_01_remove",
+        "seed": 37022,
+        "frames": 483328,
+        "wav_sha256": "b11feaa6b6fdf79205138bbdc409832bc67f6087479699cf55a0c30190d4d8b1",
+        "mel_source_sha": "e81d118c68061530c15bbdb6dcd228108ddedd61cabb9f149602e9b5f92fab14",
+        "mel_source_frames": 441000,
+        "mel_projection_sha": "d75646edfc22315377dbe5df2f037d974266efec4ff67e3a0139415ca031352b",
+        "qwen_projection_sha": "4afb10646ce2493f5fca45bce8e1810027251084d80e9e3e859ee37a5ed3bbcb",
+        "audio_tokens": 0,
+        "audio_feature_frames": 0,
+        "instruction_present": true,
+        "same_thinker_call": false
+      },
+      "a1": {
+        "id": "edit_01_remove",
+        "seed": 37022,
+        "frames": 483328,
+        "wav_sha256": "5584cb14434364b3828e3442e14adcbb6b0c0a690c66c142d3bfc6ed0d6244f4",
+        "mel_source_sha": "e81d118c68061530c15bbdb6dcd228108ddedd61cabb9f149602e9b5f92fab14",
+        "mel_source_frames": 441000,
+        "qwen_audio_sha": "91f3ef34bf06213fc94eb727c1809fc345122d8fab24a8ad906bb2680a431ae7",
+        "qwen_waveform_samples": 160000,
+        "mel_projection_sha": "d75646edfc22315377dbe5df2f037d974266efec4ff67e3a0139415ca031352b",
+        "qwen_projection_sha": "91caf145b96dd4673922e220079b00cd15631d8ccd280560e734fe1c3af1e678",
+        "audio_tokens": 250,
+        "audio_feature_frames": 1000,
+        "instruction_present": true,
+        "same_thinker_call": true
+      },
+      "a0_waveform_matches_archive": true,
+      "a0_file_matches_archive": false
+    },
+    {
+      "id": "edit_01_swap_instruction",
+      "kind": "swap_instruction",
+      "a0": {
+        "id": "edit_01_swap_instruction",
+        "seed": 37022,
+        "frames": 483328,
+        "wav_sha256": "49dc77e6da6876bf9d0903c915468a4c3248b43f20e90e52644023ef4696f88f",
+        "mel_source_sha": "e59369f5c968c400fad2d62ace139542ebb2ab9d020261cbb21cf00ba6ba463c",
+        "mel_source_frames": 441000,
+        "mel_projection_sha": "829c5389c3b416155ca8f4da2262a755aa1b0913ec883d2e52966a880eb8c1ef",
+        "qwen_projection_sha": "420fd7f88efe46a0f711ee3cafb520baec349245fd995611cafeb3e4c5ca0d83",
+        "audio_tokens": 0,
+        "audio_feature_frames": 0,
+        "instruction_present": true,
+        "same_thinker_call": false
+      },
+      "a1": {
+        "id": "edit_01_swap_instruction",
+        "seed": 37022,
+        "frames": 483328,
+        "wav_sha256": "9704ea37dc870a96879dd1569a0493aac560dd45bc0282add62c57be25a35eb3",
+        "mel_source_sha": "e59369f5c968c400fad2d62ace139542ebb2ab9d020261cbb21cf00ba6ba463c",
+        "mel_source_frames": 441000,
+        "qwen_audio_sha": "081a45b02a3a63c0ab74a3dc9323d3c3cac99592518bc7ed8da48bc9007975f4",
+        "qwen_waveform_samples": 160000,
+        "mel_projection_sha": "829c5389c3b416155ca8f4da2262a755aa1b0913ec883d2e52966a880eb8c1ef",
+        "qwen_projection_sha": "09105354886a9b03bd6df5a01f6beb960db46fbaadf1fdcdc1afe250e6c0a888",
+        "audio_tokens": 250,
+        "audio_feature_frames": 1000,
+        "instruction_present": true,
+        "same_thinker_call": true
+      },
+      "a0_waveform_matches_archive": true,
+      "a0_file_matches_archive": false
+    },
+    {
+      "id": "edit_01_swap_source",
+      "kind": "swap_source",
+      "a0": {
+        "id": "edit_01_swap_source",
+        "seed": 37022,
+        "frames": 483328,
+        "wav_sha256": "41283b5477ad075c3a8479b481751b03ff51e347a46d4fb77a9d8fc5bc6ed765",
+        "mel_source_sha": "3a6808d8c2f44fba0a09243a543394cb2a28be3e571de2bf753ae3c17fd61d50",
+        "mel_source_frames": 441000,
+        "mel_projection_sha": "bfc08f11882046a2b9067f43f6f5f7a81b613b7a0bdf67241989ff268a18cb11",
+        "qwen_projection_sha": "0558f723a81b6f70138accbaa0d2f04981afcf88534a76bb84650102d076b133",
+        "audio_tokens": 0,
+        "audio_feature_frames": 0,
+        "instruction_present": true,
+        "same_thinker_call": false
+      },
+      "a1": {
+        "id": "edit_01_swap_source",
+        "seed": 37022,
+        "frames": 483328,
+        "wav_sha256": "1e057eb435070c40afce19051564a22fcbf2fcaf2607f1d91e99670578cf9abd",
+        "mel_source_sha": "3a6808d8c2f44fba0a09243a543394cb2a28be3e571de2bf753ae3c17fd61d50",
+        "mel_source_frames": 441000,
+        "qwen_audio_sha": "c5bff7477e219ccb9d632c51d74ce6a8b637275be44e7f5a658fc69790b53a0b",
+        "qwen_waveform_samples": 160000,
+        "mel_projection_sha": "bfc08f11882046a2b9067f43f6f5f7a81b613b7a0bdf67241989ff268a18cb11",
+        "qwen_projection_sha": "8d00ec12273f0994b82a1a2028f75ae9500e24a99af7d4955443d4f3f58a8831",
+        "audio_tokens": 250,
+        "audio_feature_frames": 1000,
+        "instruction_present": true,
+        "same_thinker_call": true
+      },
+      "a0_waveform_matches_archive": true,
+      "a0_file_matches_archive": false
+    }
+  ],
+  "reuse_a0": true
+}

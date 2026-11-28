@@ -16,7 +16,7 @@ from audio_omni.prompts import SYSTEM_EDITING, _wrap_audio
 from reca_audio.train.conditioning import _apply_bottleneck
 
 from evaluate_transfer import CONFIG, FloatEdit, digest, edit, write
-from report_joint_edit import render_report
+from report_joint_edit import add_source_copy_check, render_report
 from score_transfer import score_run
 
 
@@ -214,4 +214,7 @@ if __name__ == "__main__":
         run(args.out)
     else:
         result = score_run(args.out, "cuda:0", arms=ARMS, contrasts=(("a1", "a0"),))
+        add_source_copy_check(args.out, result)
+        result["scoring_deployment"] = Path("DEPLOYED_COMMIT").read_text().strip()
+        write(args.out / "results.json", result)
         render_report(args.out, result)
