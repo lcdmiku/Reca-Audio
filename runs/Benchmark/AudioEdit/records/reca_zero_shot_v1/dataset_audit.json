@@ -1,0 +1,13 @@
+{
+  "source_archive_sha256": "615f17aff936c843e3b38cefc90ac9be3ea16f604135e70654861785d705d2fa",
+  "train_manifest_sha256": "7ed7039bcc20303f2d2277cf30d3bada1c70e86d2923c7aab70e3af5f4364030",
+  "cases": 120,
+  "sources": 96,
+  "manifest_sha256": "5e1760d86105bbf31f2934beace88ea045199f9c1445c7c7686c47928882672a",
+  "overlap": {
+    "sample_id": 0,
+    "youtube_id": 0,
+    "sha256": 0
+  },
+  "foreground_selection": "caption-reviewed candidates, maximum RMS 3 s crop; no human isolation ratings"
+}

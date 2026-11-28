@@ -1,0 +1,13 @@
+{
+  "models": [
+    "base",
+    "pure_7070",
+    "t2a_7070",
+    "mix_7070",
+    "mix_pool4_7070",
+    "text_slots_7070"
+  ],
+  "per_arm_count": 5,
+  "audio_headers_valid": true,
+  "clap_panns_finite": true
+}
