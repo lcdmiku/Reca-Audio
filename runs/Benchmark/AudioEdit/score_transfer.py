@@ -1,6 +1,7 @@
 """Score the fixed edit benchmark, keeping edit success and preservation separate."""
 
 import argparse
+import hashlib
 import json
 import sys
 import tempfile
@@ -62,9 +63,9 @@ class Features:
         self.device = device
         self.directory = directory
         self.clap = get_clap(device)
-        self.panns = get_panns(device)
-        from panns_inference import labels
-        self.labels = {str(label).casefold(): i for i, label in enumerate(labels)}
+        # AudioTagging checks the literal "cuda" and uses visible CUDA devices.
+        self.panns = get_panns("cuda" if device == "cuda:0" else device)
+        self.labels = {str(label).casefold(): i for i, label in enumerate(self.panns.labels)}
         self.paths = {}
         self.cache = {}
         self.texts = {}
@@ -414,6 +415,9 @@ def main():
     ids={r["id"] for r in rows}
     if not rows or len(ids)!=len(rows):
         raise ValueError("Missing or duplicate manifest IDs")
+    complete=json.loads((root/"GENERATION_COMPLETE").read_text(encoding="utf-8"))
+    if complete["rows"] != len(rows) or set(complete["arms"]) != set(ARMS):
+        raise ValueError("Generation completion record disagrees with the manifest")
     for row in rows:
         for key in ("source","target","background","distractor_background"):
             row[key]=resolve(root,row.get(key))
@@ -426,6 +430,14 @@ def main():
             raise ValueError(f"Incomplete benchmark for {arm} at {folder}")
         outputs[arm]={r["id"]:folder/(r["id"]+".wav") for r in rows}
         quality[arm]={i:read_audio(path,generated=True)[1] for i,path in outputs[arm].items()}
+        for row in rows:
+            path=outputs[arm][row["id"]]
+            meta=json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+            with path.open("rb") as fh:
+                digest=hashlib.file_digest(fh,"sha256").hexdigest()
+            if ((meta["id"],meta["seed"],meta["frames"],meta["wav_sha256"]) !=
+                    (row["id"],row["seed"],quality[arm][row["id"]]["frames"],digest)):
+                raise ValueError(f"Generated WAV metadata or checksum changed at {path}")
 
     with tempfile.TemporaryDirectory(prefix="reca_edit_score_") as temp:
         feat = Features(args.device,Path(temp))
@@ -446,6 +458,8 @@ def main():
                                     preservation_reference_margin=PRESERVATION_MIN, success_progress=PROGRESS_PASS),
                     detail=models,preference_unit="held-out source group",
                     native_aggregation="equal weight for available Add and Remove task means",
+                    generated_quality_cut_seconds=10,
+                    frechet_estimator="unregularized low-rank empirical covariance",
                     listening_status="pending independent listener ratings")
         write_json(root/"results.json",result)
         write_summary(root,result)
