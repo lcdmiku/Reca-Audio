@@ -62,8 +62,7 @@ def render_report(root, result):
         rows.append("| " + " | ".join([name, *percentages, *counts]) + " |")
     rows += [
         "", "机器达标率对 Add 和 Remove 等权平均，末四列仅统计同时具备编辑与保留判定的样本。"
-        "源复制对照和目标参考校准可查看逐条分数。若 A1 的背景指标改善而仅保留计数增加、编辑响应减弱，"
-        "联合指标可量化这种取舍。", "",
+        "源复制对照和目标参考校准可查看逐条分数。", "",
         "## A1 减 A0 的逐样本配对估计", "",
         "| 任务与指标 | 个数／源组数 | 差值 | 95% 配对区间 |", "|---|---:|---:|---:|",
     ]
@@ -110,10 +109,20 @@ def render_report(root, result):
                  "该频谱指标用于识别复制倾向。"]
     joint = delta["native"]["joint_success"]
     edit = delta["native"]["edit_success"]
-    if joint and edit and joint["ci95"][0] > 0 and edit["ci95"][1] >= 0:
-        rows += ["", "本轮联合达标有正向配对证据。训练决策应结合换源、换指令和分任务结果。"]
+    if joint and joint["ci95"][0] > 0:
+        rows += ["", "A1 在本诊断集提高了编辑与保留的联合达标率。"]
+        if edit and edit["ci95"][1] < 0:
+            rows.append("编辑达标率同时下降。现有设置改善了背景保留，但会牺牲指令执行，"
+                        "当前证据不足以支持直接沿用该设置进入训练。")
+        else:
+            rows.append("训练决策还需结合换源、换指令和分任务结果。")
     else:
         rows += ["", "本轮机器指标尚未建立联合达标收益。现有结果不足以把这项推理改动作为训练收益的依据。"]
+    source = delta["swap_source"]["source_switch_margin"]
+    instruction = delta["swap_instruction"]["instruction_switch_margin"]
+    if source and instruction and source["ci95"][0] > 0 and instruction["ci95"][1] < 0:
+        rows.append("固定指令换源时，A1 的背景分差增大。固定源换指令时，A1 的文本响应减弱。"
+                    "这两项干预指向对源音频的更强依赖。")
     rows += ["", "区间以源组进行 10,000 次配对重采样。各模型仅用同一 Base，"
              "评分描述已有诊断集和机器代理。辅助指标的区间未作多重比较修正。", "",
              "[逐条结果](results.json) · [条件检查](condition_checks.json) · [推理配置](inference_protocol.json)"]

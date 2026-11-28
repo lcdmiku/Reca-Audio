@@ -1,0 +1,8 @@
+{
+  "rows": 120,
+  "arms": [
+    "a0",
+    "a1"
+  ],
+  "reused_a0": true
+}
