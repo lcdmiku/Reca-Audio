@@ -6,4 +6,6 @@
 
 正式任务使用 GPU 1、2，顺序运行六个 checkpoint，100 步 Rectified Flow Euler，CFG=7，提交 `d7b4534`。服务器运行根为 `/home/linchudeng/Reca-Audio/runs/Benchmark/output/AudioEdit_reca_zero_shot_v1/`。该根下的 `formal/` 保存原始音频、日志和评分。公开盲听题本单独放在 `listening/form/`，模型标签保存在题本目录之外。
 
+720 条输出于北京时间 2026-11-28 15:15 完成评分。[研究结论](analysis.md) · [机器指标](machine_summary.md) · [逐条分数与区间](results.json) · [推理参数](inference_protocol.json)
+
 [冻结清单](manifest.jsonl) · [数据审计](dataset_audit.json) · [Smoke 评分验收](smoke_scores.json) · [条件干预检查](condition_checks.json) · [评测协议](../../../audio_edit_transfer_protocol.md)
