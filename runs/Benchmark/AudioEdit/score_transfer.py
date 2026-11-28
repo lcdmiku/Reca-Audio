@@ -380,7 +380,7 @@ def model_summary(rows):
                 native_contingency_table=contingency)
 
 
-def bootstrap(models):
+def bootstrap(models, contrasts=CONTRASTS):
     kinds = {
         "native": ("edit_success","preserve_success","joint_success","event_progress_clap",
                    "event_progress_panns","preserve_progress","preserve_logmel","preserve_sisdr",
@@ -394,7 +394,7 @@ def bootstrap(models):
         "swap_source": ("source_switch_margin","source_switch_success"),
     }
     result = {}
-    for a,b in CONTRASTS:
+    for a,b in contrasts:
         contrast = {}
         for kind, fields in kinds.items():
             accept = {"add","remove"} if kind=="native" else {kind}
@@ -410,13 +410,19 @@ def main():
     parser.add_argument("--device",default="cuda:0")
     parser.add_argument("--smoke",action="store_true")
     args=parser.parse_args()
-    root=args.out.resolve()
+    result = score_run(args.out, args.device, smoke=args.smoke)
+    if result is not None:
+        write_summary(args.out, result)
+
+
+def score_run(out, device, *, smoke=False, arms=ARMS, contrasts=CONTRASTS):
+    root=out.resolve()
     rows=[json.loads(line) for line in (root/"manifest.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
     ids={r["id"] for r in rows}
     if not rows or len(ids)!=len(rows):
         raise ValueError("Missing or duplicate manifest IDs")
     complete=json.loads((root/"GENERATION_COMPLETE").read_text(encoding="utf-8"))
-    if complete["rows"] != len(rows) or set(complete["arms"]) != set(ARMS):
+    if complete["rows"] != len(rows) or set(complete["arms"]) != set(arms):
         raise ValueError("Generation completion record disagrees with the manifest")
     for row in rows:
         for key in ("source","target","background","distractor_background"):
@@ -424,7 +430,7 @@ def main():
         row["group"] = row.get("group",row["id"])
     outputs={}
     quality={}
-    for arm in ARMS:
+    for arm in arms:
         folder=root/"audio"/arm
         if {p.stem for p in folder.glob("*.wav")}!=ids:
             raise ValueError(f"Incomplete benchmark for {arm} at {folder}")
@@ -440,20 +446,20 @@ def main():
                 raise ValueError(f"Generated WAV metadata or checksum changed at {path}")
 
     with tempfile.TemporaryDirectory(prefix="reca_edit_score_") as temp:
-        feat = Features(args.device,Path(temp))
-        if args.smoke:
-            keys=[feat.prepare(outputs[a][rows[0]["id"]],(0,10),"full") for a in ARMS]
+        feat = Features(device,Path(temp))
+        if smoke:
+            keys=[feat.prepare(outputs[a][rows[0]["id"]],(0,10),"full") for a in arms]
             feat.run(keys,keys)
             assert all(np.isfinite(feat.cache[k]["clap"]).all() and np.isfinite(feat.cache[k]["panns"]).all()
                        for k in keys)
-            write_json(root/"smoke_scores.json",dict(models=list(ARMS), per_arm_count=len(rows),
+            write_json(root/"smoke_scores.json",dict(models=list(arms), per_arm_count=len(rows),
                                                      audio_headers_valid=True, clap_panns_finite=True))
             return
 
         models,distributions,calibration=score_formal(feat,rows,outputs,quality)
         result=dict(metrics={arm:model_summary(values) for arm,values in models.items()},
                     known_controls={name:model_summary(values) for name,values in calibration.items()},
-                    paired=bootstrap(models), quality=distributions,
+                    paired=bootstrap(models, contrasts), quality=distributions,
                     thresholds=dict(event_clap_margin=EVENT_CLAP_MIN,event_panns_margin=EVENT_PANNS_MIN,
                                     preservation_reference_margin=PRESERVATION_MIN, success_progress=PROGRESS_PASS),
                     detail=models,preference_unit="held-out source group",
@@ -462,7 +468,7 @@ def main():
                     frechet_estimator="unregularized low-rank empirical covariance",
                     listening_status="pending independent listener ratings")
         write_json(root/"results.json",result)
-        write_summary(root,result)
+        return result
 
 
 def score_formal(feat, rows, outputs, quality):
@@ -526,7 +532,7 @@ def score_formal(feat, rows, outputs, quality):
             cal=native_row(feat,row,y,features_for,tgt,src,bg,alt)
             calibration[name].append(dict(id=row["id"],group=row["group"],kind=row["kind"],**cal))
 
-    for arm in ARMS:
+    for arm in outputs:
         refs={}
         for row in rows:
             refs[row["id"]]=features(row,outputs[arm][row["id"]],specs[row["id"]][0])
