@@ -4,8 +4,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from shutil import copy2
 from unittest.mock import patch
 
+import numpy as np
 import soundfile as sf
 import torch
 from torchaudio.functional import resample
@@ -128,8 +130,14 @@ def pilot(api, rows, out):
         if a0["qwen_projection_sha"] == a1["qwen_projection_sha"]:
             raise ValueError(f"Qwen output was unaffected for {row['id']}")
         previous = HISTORICAL / "audio/base" / f"{row['id']}.wav"
+        new = out / "pilot/audio/a0" / previous.name
+        a0_wave, new_rate = sf.read(new, dtype="float32")
+        reference_wave, reference_rate = sf.read(previous, dtype="float32")
+        # Float WAV headers may store metadata that differs between writes.
+        same_waveform = new_rate == reference_rate == 44100 and np.array_equal(a0_wave, reference_wave)
         records.append(dict(id=row["id"], kind=row["kind"], a0=a0, a1=a1,
-                            a0_matches_archive=a0["wav_sha256"] == digest(previous)))
+                            a0_waveform_matches_archive=same_waveform,
+                            a0_file_matches_archive=a0["wav_sha256"] == digest(previous)))
     native, _, change_instruction, change_source = records
     if not (native["a1"]["qwen_audio_sha"] == change_instruction["a1"]["qwen_audio_sha"]
             and native["a1"]["qwen_audio_sha"] != change_source["a1"]["qwen_audio_sha"]
@@ -139,7 +147,7 @@ def pilot(api, rows, out):
             and native["a1"]["mel_projection_sha"] == change_instruction["a1"]["mel_projection_sha"]
             and native["a1"]["mel_projection_sha"] != change_source["a1"]["mel_projection_sha"]):
         raise ValueError("Pilot source/instruction intervention failed")
-    reuse = all(row["a0_matches_archive"] for row in records)
+    reuse = all(row["a0_waveform_matches_archive"] for row in records)
     write(out / "condition_checks.json", dict(rows=records, reuse_a0=reuse))
     return reuse
 
@@ -185,6 +193,13 @@ def run(out):
             raise ValueError("Unexpected A0 output source")
     for arm in ARMS[1:] if reuse_a0 else ARMS:
         for row in rows:
+            artifact = f"{row['id']}.wav"
+            pilot_wav = out / "pilot" / "audio" / arm / artifact
+            full_wav = out / "audio" / arm / artifact
+            if pilot_wav.exists() and not full_wav.with_suffix(".json").exists():
+                full_wav.parent.mkdir(parents=True, exist_ok=True)
+                copy2(pilot_wav, full_wav)
+                copy2(pilot_wav.with_suffix(".json"), full_wav.with_suffix(".json"))
             generate_case(api, row, out, arm)
     write(out / "GENERATION_COMPLETE", dict(rows=len(rows), arms=list(ARMS), reused_a0=reuse_a0))
 
